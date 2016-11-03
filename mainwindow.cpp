@@ -167,7 +167,7 @@ void MainWindow::device_scan_come()
             QUdpSocket *device_scan_join_up = new QUdpSocket(this);
             char mac[17];
             get_mac(mac);
-            QByteArray msg = "{\"name\":\"video_player_01\",\"type\":0}"; //Fixme
+            QByteArray msg = "{\"name\":\"video_player_01\",\"type\":1}"; //Fixme
             msg.replace(22,2,mac);
             qDebug()<<"res msg:"<<msg;
             device_scan_join_up->writeDatagram(msg.data(), msg.size(),*hostaddr, 40002);
@@ -306,7 +306,7 @@ void MainWindow::showJpeg(int width, int height){
 //QAbstractSocket类提供了所有scoket的通用功能，socketError为枚举型
 void MainWindow::displayError(QAbstractSocket::SocketError socketError)
 {
-    qDebug() <<"error msg:"<< audio_data_receiver->errorString();
+    qDebug() <<"error msg:"<< video_compressed_data_receiver->errorString();
 }
 
 //receive compressed video data and start thread to decodec

@@ -26,6 +26,11 @@ enum AudioType
     TYPE_AAC = 1,
     TYPE_PCM = 2
 };
+enum DeviceType{
+    DEVICE_AUDIO = 0,
+    DEVICE_VIDEO = 1,
+    DEVICE_PRINTER = 2
+};
 
 class MainWindow : public QDialog
 {
@@ -47,6 +52,7 @@ private slots:
     void receive_video_data();
     void showJpeg(int width, int height);    //show jpeg data
     void slotClose();
+    int getDeviceType();
 signals:
     void resize_s();      //jpeg data
 
@@ -67,6 +73,10 @@ public slots:
 signals:
     void audio_play_s();
     void decode_s();
+
+//file print
+public slots:
+    void receive_file_data();
 
 private:
     Ui::MainWindow *ui;
@@ -124,6 +134,17 @@ private:
     AudioPlayer * mAudioPlayer;
     AudioDec * mAudioDec;
     volatile bool mAudioPlayBackFlag;
+
+    //file print
+    int file_data_port;
+    QTcpSocket *file_data_receiver;
+    quint32  filetotalbytes;                   //总共需接收的字节数
+    quint32  filebytesreceived;                //已接收字节数
+    QByteArray filedata;
+    QBuffer *filebuffer;
+//    QFile *localFile;                     //待接收文件
+    QByteArray fileinblock;
+    QDataStream *fileinstream;
 
 
 public:

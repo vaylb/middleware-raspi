@@ -47,7 +47,7 @@ void JpegResize::resize(){
             pixmap = imgtemp.scaled(width,screenHeight,Qt::KeepAspectRatio,Qt::SmoothTransformation);
 
             framesOut.append(pixmap);
-            showFrame(contentWidth, contentHeight);
+            showFrame(width, screenHeight);
         }
     }
 }

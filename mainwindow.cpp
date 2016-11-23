@@ -9,6 +9,7 @@
 #include <QApplication>
 #include <QDesktopWidget>
 #include <QTime>
+//#define AVCODEC_MAX_AUDIO_FRAME_SIZE 192000 // 1 second of 48khz 32bit audio
 
 DataBuffer* MainWindow::video_compressed_data_pool = new DataBuffer(32768*400);//12.5M
 DataBuffer* MainWindow::mDataPool = new DataBuffer(1024*4*16);
@@ -23,17 +24,26 @@ MainWindow::MainWindow(QWidget *parent) :
     mShowJpegFlag(true),
     mSetupFlag(false),
     mAudioStartFlag(false),
-    mAudioPlayBackFlag(false)
+    mAudioPlayBackFlag(false),
+    videoDecThread(NULL),
+    audioPlayThread(NULL),
+    audioDecodeThread(NULL),
+    mVideoDec(NULL),
+    readTimer(NULL),
+    filetotalbytes(0),
+    filebytesreceived(0)
+
 {
 //    setenv("EGL_FORCE_DRI3","1",1);
     videoShow = new QLabel;
     videoShowTips = new QLabel;
     mainLayout = new QVBoxLayout;
     mainLayout->addWidget(videoShow, 0, Qt::AlignCenter|Qt::AlignBottom);
-    videoShow->setText("中间件系统");
+//    videoShow->setText("中间件系统");
+    videoShow->setText("无线适配投影系统");
     videoShow->setStyleSheet("font-size:40px");
     mainLayout->addWidget(videoShowTips,0, Qt::AlignCenter|Qt::AlignTop);
-    videoShowTips->setText("扫描网络连接...");
+    videoShowTips->setText("等待连接...");
     videoShowTips->setStyleSheet("font-size:20px");
     setLayout(mainLayout);
     setWindowTitle("中间件系统");
@@ -47,45 +57,6 @@ MainWindow::MainWindow(QWidget *parent) :
     printscreeninfo();
 
     startListening();
-//    int i =0;
-//    int t =0;
-//    system("sudo cp  /etc/wpa_supplicant/wpa_supplicant.conf ./wpa_supplicant_temp.conf");
-//    system("sudo iwlist wlan0 scan >./temp ");
-//    system("grep -E \"SSID|Quality\" temp >./grepTemp");
-//    system("grep -v \"x00\" grepTemp >./temp");
-//    QString fileName;
-//    fileName = "/home/pi/middleware/video/build-middleware-qt-Desktop-Debug/temp";
-//    QFile file(fileName);
-//    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
-//    {
-//        qDebug()<<"!";
-//        return;
-//    }
-//    QTextStream in(&file);
-//    QString line = in.readLine();
-//    while (i<20)
-//    {
-//        line = in.readLine();
-//        for(t=27;t<line.size()-1;t++)       //take off  other words
-//        {
-//            wifiName[i] +=line[t];
-//        }
-//        line = in.readLine();
-//        for(t=28;t<30;t++)       //take off  other words
-//        {
-//            temp[i] +=line[t];
-//        }
-//        i++;
-//    }
-//    for(i=0;i<20;i++)
-//    {
-//        if(wifiName[i].compare("Middleware") == 0){
-//            QString wifiConnect = tr("sudo iwconfig wlan0 essid \"%1\" ").arg(wifiName[i]);
-//            qDebug()<<wifiConnect;
-//            system(wifiConnect.toStdString().c_str());
-//            break;
-//        }
-//    }
 }
 
 MainWindow::~MainWindow()
@@ -129,6 +100,13 @@ void MainWindow::startListening(){
     connect(audio_data_receiver, SIGNAL(readyRead()), this, SLOT(receive_audio_data()));
     connect(audio_data_receiver, SIGNAL(error(QAbstractSocket::SocketError)), this,
             SLOT(displayError(QAbstractSocket::SocketError)));
+
+    //file print
+    file_data_port = 40006;
+    file_data_receiver = new QTcpSocket(this);
+    connect(file_data_receiver, SIGNAL(readyRead()), this, SLOT(receive_file_data()));
+    connect(file_data_receiver, SIGNAL(error(QAbstractSocket::SocketError)), this,
+            SLOT(displayError(QAbstractSocket::SocketError)));
 }
 
 void MainWindow::on_pushButton_clicked()
@@ -164,11 +142,23 @@ void MainWindow::device_scan_come()
         qDebug()<<"device scan, receive:"<<datagram.data()<<", ip:"<<host_ip;
         if(strcmp(datagram.data(),"a")==0){
             //response to device scan
-            QUdpSocket *device_scan_join_up = new QUdpSocket(this);
-            char mac[17];
+            int type = getDeviceType();
+            char mac[18];
             get_mac(mac);
-            QByteArray msg = "{\"name\":\"video_player_01\",\"type\":1}"; //Fixme
-            msg.replace(22,2,mac);
+            mac[17] = '\0';
+
+            QByteArray msg;
+            if(type == DEVICE_AUDIO){
+                msg = "{\"name\":\"audio_player_01\",\"type\":0}";
+                msg.replace(22,2,mac);
+            }else if (type == DEVICE_VIDEO){
+                msg = "{\"name\":\"video_player_01\",\"type\":1}";
+                msg.replace(22,2,mac);
+            }else {
+                msg = "{\"name\":\"printer_01\",\"type\":2}";
+                msg.replace(17,2,mac);
+            }
+            QUdpSocket *device_scan_join_up = new QUdpSocket(this);
             qDebug()<<"res msg:"<<msg;
             device_scan_join_up->writeDatagram(msg.data(), msg.size(),*hostaddr, 40002);
             delete device_scan_join_up;
@@ -190,6 +180,7 @@ void MainWindow::device_scan_come()
             video_data_receiver->connectToHost(*hostaddr, video_data_port);//连接到指定ip地址和端口的主机
         }
         else if(strcmp(datagram.data(),"d")==0){
+//            this->show();
             videoShow->setText("");
             mainLayout->setAlignment(videoShow,Qt::AlignCenter);
             videoShowTips->setHidden(true);
@@ -224,23 +215,32 @@ void MainWindow::device_scan_come()
             QRect deskrect = dwsktopwidget->availableGeometry();
             videoShow->setFixedWidth(deskrect.width());
             videoShow->setFixedHeight(deskrect.height()/2);
-            videoShow->setText("中间件系统");
+            videoShow->setText("无线适配投影系统");
             videoShow->setAlignment(Qt::AlignCenter|Qt::AlignBottom);
             videoShowTips->setHidden(false);
             videoShowTips->setText("播放结束");
             videoShowTips->setAlignment(Qt::AlignCenter|Qt::AlignTop);
-//            qDebug()<<video_compressed_data_receiver->state();
-//            qDebug()<<video_data_receiver->state();
-//            qDebug()<<audio_data_receiver->state();
-//            if(videoDecThread != NULL && videoDecThread->isRunning()){
-//                mVideoDec->exitFlag = true;
-//            }
-//            if(audioPlayThread != NULL && audioPlayThread->isRunning()){
-//                   mAudioPlayer->mExitFlag = true;
-//            }
-//            if(audioDecodeThread != NULL && audioDecodeThread->isRunning()){
-//                mAudioDec->mExitFlag = true;
-//            }
+            if(videoDecThread != NULL && videoDecThread->isRunning()){
+                mVideoDec->exitFlag = true;
+                videoDecThread->exit();
+                videoDecThread = NULL;
+                if(mVideoDec != NULL){
+                    mVideoDec = NULL;
+                }
+                if(readTimer != NULL){
+                    readTimer = NULL;
+                }
+            }
+            if(audioPlayThread != NULL && audioPlayThread->isRunning()){
+                   mAudioPlayer->mExitFlag = true;
+            }
+            if(audioDecodeThread != NULL && audioDecodeThread->isRunning()){
+                mAudioDec->mExitFlag = true;
+            }
+        }
+        else if(strcmp(datagram.data(),"h")==0){
+            videoShowTips->setText("文件打印...");
+            file_data_receiver->connectToHost(*hostaddr, file_data_port);
         }
         delete hostaddr;
         delete hostport;
@@ -328,9 +328,15 @@ void MainWindow::receive_compressed_video_data()
 
     if(!startflag && video_compressed_data_pool->getReadSpace()>1024*256){
         startflag = true;
-        videoDecThread = new QThread(this);
-        mVideoDec = new VideoDec();
-        readTimer = new QTimer(this);
+        if(videoDecThread == NULL){
+                    videoDecThread = new QThread(this);
+        }
+        if(mVideoDec == NULL){
+                    mVideoDec = new VideoDec();
+        }
+        if(readTimer == NULL){
+            readTimer = new QTimer(this);
+        }
         mVideoDec->moveToThread(videoDecThread);
 
         connect(this,SIGNAL(init_s()),mVideoDec,SLOT(init()));
@@ -345,6 +351,9 @@ void MainWindow::receive_compressed_video_data()
 
 void MainWindow::showVideo()
 {
+    if(mVideoDec == NULL){
+        return;
+    }
     QPixmap pix;
     if(mVideoDec->exitFlag || mVideoDec->videoImg.isEmpty()) {
         if(mVideoDec->exitFlag){
@@ -457,8 +466,72 @@ void MainWindow::receive_audio_data(){
     }
 }
 
-void MainWindow::printscreeninfo()
+void MainWindow::receive_file_data()
+{
+    if(filebytesreceived < sizeof(quint32)){
+        fileinstream = new QDataStream(file_data_receiver);
+        if((file_data_receiver->bytesAvailable() >= sizeof(quint32))){
+            *fileinstream >> filetotalbytes;
+            filebytesreceived += sizeof(quint32);
+            qDebug() <<"receive new file size:"<<filetotalbytes;
+        }
+        filedata.resize(0);
+        filebuffer = new QBuffer(&filedata);
+        filebuffer->open(QIODevice::WriteOnly);
+        return;
+    }
 
+    if (filebytesreceived < filetotalbytes){
+        qint32  available = file_data_receiver->bytesAvailable();
+//        qDebug() <<"image available:"<<available;
+        if((filebytesreceived+available)>filetotalbytes){
+            available = filetotalbytes-filebytesreceived;
+            fileinblock = file_data_receiver->read(available);
+        }else{
+            fileinblock = file_data_receiver->readAll();
+        }
+
+        filebytesreceived += available;
+        filebuffer->write(fileinblock,available);
+        fileinblock.resize(0);
+    }
+
+    if (filebytesreceived == filetotalbytes) {
+        filebuffer->close();
+        filebuffer->open(QIODevice::ReadOnly);
+
+        QDateTime time = QDateTime::currentDateTime();
+        QString filename = "/home/pi/middleware/fileprint/"+time.toString("yyyy-MM-dd-hh-mm-ss")+".pdf";
+        QString filefixname = "/home/pi/middleware/fileprint/"+time.toString("yyyy-MM-dd-hh-mm-ss")+"_fix.pdf";
+
+        QFile *file = new QFile(filename);
+        if(!file->open(QIODevice::WriteOnly)){
+            qDebug() <<"open file fail";
+        }
+        file->write(filebuffer->data());
+        file->close();
+
+
+//        QImage img;
+//        int ret = img.loadFromData(imagebuffer->data());
+//        if(ret){
+//            mJpegResize->framesIn.append(img);
+//        }
+        qDebug() <<"file receive success";
+        QString command_fix = "sudo pdftk "+filename+" output "+filefixname;
+        system(command_fix.toStdString().c_str());
+        QString command_rm = "sudo rm "+filename;
+        system(command_rm.toStdString().c_str());
+        QString command_print = "sudo lp -d HP_1010 "+filefixname;
+        system(command_print.toStdString().c_str());
+        filebuffer->close();
+        delete filebuffer;
+        filebytesreceived = 0;
+        filetotalbytes = 0;
+    }
+}
+
+void MainWindow::printscreeninfo()
 {
     QDesktopWidget *dwsktopwidget = QApplication::desktop();
     QRect deskrect = dwsktopwidget->availableGeometry();
@@ -503,4 +576,16 @@ int MainWindow::get_mac(char* mac)
     ::close(sock_mac);
     memcpy(mac,mac_addr,strlen(mac_addr));
     return 0;
+}
+
+int MainWindow::getDeviceType(){
+    return DEVICE_PRINTER;
+//    system("sudo tvservice -d /home/pi/edid/edid_hdmi_plugin_test.txt");
+//    QFile file("/home/pi/edid/edid_hdmi_plugin_test.txt");
+//    if(file.exists()){
+//        system("sudo rm /home/pi/edid/edid_hdmi_plugin_test.txt");
+//        return DEVICE_VIDEO;
+//    }else{
+//        return DEVICE_AUDIO;
+//    }
 }

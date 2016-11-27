@@ -86,7 +86,7 @@ int DataBuffer::Write(char *src, int cnt){
 void DataBuffer::Reset(){
     read_ptr=0;
     write_ptr=0;
-    memset(buffer,0,bufsize);
+    //memset(buffer,0,bufsize);
 }
 
 int64_t DataBuffer::seek(int offset, int whence){

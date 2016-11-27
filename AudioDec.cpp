@@ -8,7 +8,7 @@ extern "C"
 
 int read_buffer_audio(void *opaque, uint8_t *buf, int buf_size){
     while(MainWindow::mDataPool->getReadSpace()<buf_size){
-        usleep(500);
+        usleep(50000);
 //        qDebug()<<"mDataPool no data can read "<<MainWindow::mDataPool->getReadSpace();
     }
     return MainWindow::mDataPool->Read((char*)buf,buf_size);
@@ -18,10 +18,11 @@ AudioDec::AudioDec(QObject *parent) :
     QObject(parent),
     mExitFlag(false)
 {
+    qDebug()<<"AudioDec constructor";
 }
 void AudioDec::decode()
 {
-    qDebug()<<"------------------audio_decode_thread run --------------------";
+    qDebug()<<"------------------ audio_decode_thread run --------------------";
     avcodec_register_all();/*注册所有的编码解码器*/
     av_register_all();
     AVFormatContext *pFormatCtx;
@@ -106,8 +107,8 @@ void AudioDec::decode()
                 }
                 if (out_size > 0)
                 {
-                    while(MainWindow::mPcmPool->getWriteSpace()<out_size) {
-                        usleep(2000);
+                    while(!mExitFlag && MainWindow::mPcmPool->getWriteSpace()<out_size) {
+                        usleep(100000);
                     }
 //                    qDebug()<<"write %d to pool "<<out_size;
                     MainWindow::mPcmPool->Write((char*)outbuf,out_size);

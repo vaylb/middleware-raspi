@@ -42,6 +42,7 @@ public:
 
 private slots:
     void on_pushButton_clicked();
+    void sendMessage(QString msg);
 
     void device_scan_come(); //scan
     void displayError(QAbstractSocket::SocketError);
@@ -53,6 +54,9 @@ private slots:
     void showJpeg(int width, int height);    //show jpeg data
     void slotClose();
     int getDeviceType();
+    QString getJobDoneMsg();
+    void logDebug(QString msg);
+
 signals:
     void resize_s();      //jpeg data
 
@@ -82,6 +86,7 @@ private:
     Ui::MainWindow *ui;
     QVBoxLayout *mainLayout;
     QPushButton *closeButton;
+    QString mHostAddr;
 
     int device_scan_port;
     QUdpSocket *device_scan_receiver;
@@ -134,6 +139,9 @@ private:
     AudioPlayer * mAudioPlayer;
     AudioDec * mAudioDec;
     volatile bool mAudioPlayBackFlag;
+    volatile bool mAudioDataFileFlag; //为true需要接收定量数据
+    quint32  mAudioDataFileTotalBytes;
+    quint32  mAudioDataFileReceived;
 
     //file print
     int file_data_port;

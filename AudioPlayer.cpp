@@ -8,10 +8,11 @@ AudioPlayer::AudioPlayer(int channels, int frequency, int framebits, QObject *pa
     mAudioFrequency(frequency),
     mAudioFramebits(framebits)
 {
+    qDebug()<<"AudioPlayer constructor";
 }
 void AudioPlayer::play()
 {
-    printf("audio_play_thread start\n");
+    qDebug()<<"-------------------- audio_play_thread start --------------------";
     int rc;
     int ret;
     int size;

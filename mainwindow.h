@@ -32,6 +32,11 @@ enum DeviceType{
     DEVICE_PRINTER = 2
 };
 
+enum PrintFileType{
+    TYPE_FILE = 0,
+    TYPE_DRIVER = 1
+};
+
 class MainWindow : public QDialog
 {
     Q_OBJECT
@@ -153,6 +158,7 @@ private:
 //    QFile *localFile;                     //待接收文件
     QByteArray fileinblock;
     QDataStream *fileinstream;
+    qint32 mPrintFileType;
 
 
 public:

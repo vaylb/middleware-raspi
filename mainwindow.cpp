@@ -153,15 +153,14 @@ void MainWindow::device_scan_come()
 
             QByteArray msg;
             if(type == DEVICE_AUDIO){
-                msg = "{\"name\":\"audio_player_01\",\"type\":0}";
-                msg.replace(22,2,mac);
+                msg = "{\"name\":\"01\",\"type\":0}";
             }else if (type == DEVICE_VIDEO){
-                msg = "{\"name\":\"video_player_01\",\"type\":1}";
-                msg.replace(22,2,mac);
+                msg = "{\"name\":\"01\",\"type\":1}";
             }else {
-                msg = "{\"name\":\"printer_01\",\"type\":2}";
-                msg.replace(17,2,mac);
+                msg = "{\"name\":\"01\",\"type\":2}";
             }
+            msg.replace(9,2,mac);
+
             QUdpSocket *device_scan_join_up = new QUdpSocket(this);
             qDebug()<<"res msg:"<<msg;
             device_scan_join_up->writeDatagram(msg.data(), msg.size(),*hostaddr, 40002);
@@ -261,6 +260,12 @@ void MainWindow::device_scan_come()
         }
         else if(strcmp(datagram.data(),"h")==0){
             videoShowTips->setText("文件打印...");
+            mPrintFileType = TYPE_FILE;
+            file_data_receiver->connectToHost(*hostaddr, file_data_port);
+        }
+        else if(strcmp(datagram.data(),"i")==0){
+            videoShowTips->setText("安装打印驱动...");
+            mPrintFileType = TYPE_DRIVER;
             file_data_receiver->connectToHost(*hostaddr, file_data_port);
         }
         delete hostaddr;
@@ -605,8 +610,14 @@ void MainWindow::receive_file_data()
         filebuffer->open(QIODevice::ReadOnly);
 
         QDateTime time = QDateTime::currentDateTime();
-        QString filename = "/home/pi/middleware/fileprint/"+time.toString("yyyy-MM-dd-hh-mm-ss")+".pdf";
-        QString filefixname = "/home/pi/middleware/fileprint/"+time.toString("yyyy-MM-dd-hh-mm-ss")+"_fix.pdf";
+        QString filename;
+        QString filefixname;
+        if(mPrintFileType == TYPE_FILE){
+            filename = "/home/pi/middleware/fileprint/"+time.toString("yyyy-MM-dd-hh-mm-ss")+".pdf";
+            filefixname = "/home/pi/middleware/fileprint/"+time.toString("yyyy-MM-dd-hh-mm-ss")+"_fix.pdf";
+        }else if(mPrintFileType == TYPE_DRIVER){
+            filename = "/home/pi/middleware/drivers/"+time.toString("yyyy-MM-dd-hh-mm-ss")+".deb";
+        }
 
         QFile *file = new QFile(filename);
         if(!file->open(QIODevice::WriteOnly)){
@@ -615,12 +626,19 @@ void MainWindow::receive_file_data()
         file->write(filebuffer->data());
         file->close();
         qDebug() <<"file receive success";
-        QString command_fix = "sudo pdftk "+filename+" output "+filefixname;
-        system(command_fix.toStdString().c_str());
-        QString command_rm = "sudo rm "+filename;
-        system(command_rm.toStdString().c_str());
-        QString command_print = "sudo lp -d HP_1010 "+filefixname;
-        system(command_print.toStdString().c_str());
+
+        if(mPrintFileType == TYPE_FILE){
+            QString command_fix = "sudo pdftk "+filename+" output "+filefixname;
+            system(command_fix.toStdString().c_str());
+            QString command_rm = "sudo rm "+filename;
+            system(command_rm.toStdString().c_str());
+            QString command_print = "sudo lp -d HP_1010 "+filefixname;
+            system(command_print.toStdString().c_str());
+        } else if(mPrintFileType == TYPE_DRIVER){
+            QString command_driver = "sudo dpkg -i "+filename;
+            system(command_driver.toStdString().c_str());
+        }
+
         filebuffer->close();
         delete filebuffer;
         filebytesreceived = 0;
@@ -693,7 +711,7 @@ int MainWindow::get_mac(char* mac){
 }
 
 int MainWindow::getDeviceType(){
-    return DEVICE_AUDIO;
+    return DEVICE_PRINTER;
 //    system("sudo tvservice -d /home/pi/edid/edid_hdmi_plugin_test.txt");
 //    QFile file("/home/pi/edid/edid_hdmi_plugin_test.txt");
 //    if(file.exists()){

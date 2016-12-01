@@ -33,6 +33,7 @@ public:
     AVCodec *pCodec;
     AVPacket packet;
     AVFrame *pFrame,*pFrameRGB;
+    AVIOContext *avio;
     char *FileName;
     QQueue<QImage> videoImg;
     volatile bool exitFlag;

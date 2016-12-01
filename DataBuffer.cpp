@@ -20,12 +20,12 @@ int DataBuffer::getReadSpace(){
 }
 
 int DataBuffer::getWriteSpace(){
-    read_mutex.lock();
-    write_mutex.lock();
+//    read_mutex.lock();
+//    write_mutex.lock();
     int res = bufsize-(write_ptr-read_ptr);
 //    qDebug()<<"getWriteSpace, read_ptr = "<<read_ptr<<", write_ptr = "<<write_ptr<<", res = "<<res;
-    write_mutex.unlock();
-    read_mutex.unlock();
+//    write_mutex.unlock();
+//    read_mutex.unlock();
     return res;
 }
 
@@ -34,19 +34,19 @@ void DataBuffer::setWritePos(int pos){
 }
 
 int DataBuffer::setReadPos(int pos){
-    read_mutex.lock();
+//    read_mutex.lock();
     read_ptr=pos;
-    read_mutex.unlock();
+//    read_mutex.unlock();
     return read_ptr;
 }
 
 int DataBuffer::Read( char *dest, int cnt){
-    read_mutex.lock();
+//    read_mutex.lock();
     int curptr=read_ptr%bufsize;
     if(bufsize-curptr>=cnt){
         memcpy(dest,buffer+curptr,cnt);
         read_ptr+=cnt;
-        read_mutex.unlock();
+//        read_mutex.unlock();
         return cnt;
     }else{
         int n1=bufsize-curptr;
@@ -54,7 +54,7 @@ int DataBuffer::Read( char *dest, int cnt){
         int n2=cnt-n1;
         memcpy(dest+n1,buffer,n2);
         read_ptr+=cnt;
-        read_mutex.unlock();
+//        read_mutex.unlock();
         return cnt;
     }
 
@@ -63,12 +63,12 @@ int DataBuffer::Read( char *dest, int cnt){
 int DataBuffer::Write(char *src, int cnt){
     int capacity = getWriteSpace();
     if(capacity>=cnt){
-        write_mutex.lock();
+//        write_mutex.lock();
         int curptr=write_ptr%bufsize;
         if(bufsize-curptr>=cnt){
             memcpy(buffer+curptr,src,cnt);
             write_ptr+=cnt;
-            write_mutex.unlock();
+//            write_mutex.unlock();
             return cnt;
         }else{
             int n1=bufsize-curptr;
@@ -76,7 +76,7 @@ int DataBuffer::Write(char *src, int cnt){
             int n2=cnt-n1;
             memcpy(buffer,src+n1,n2);
             write_ptr+=cnt;
-            write_mutex.unlock();
+//            write_mutex.unlock();
             return cnt;
         }
     }else return 0;

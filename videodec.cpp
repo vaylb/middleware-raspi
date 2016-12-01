@@ -4,11 +4,18 @@
 #include <QDesktopWidget>
 
 int read_buffer(void *opaque, uint8_t *buf, int buf_size){
-    while(MainWindow::video_compressed_data_pool->getReadSpace()<buf_size){
+//    while(MainWindow::video_compressed_data_pool->getReadSpace()<buf_size){
 //        qDebug()<<"----------buffer read have no data----------";
-        usleep(100);
+//        usleep(100);
+//    }
+//    return MainWindow::video_compressed_data_pool->Read((char*)buf,buf_size);
+
+    int available;
+    while((available = MainWindow::video_compressed_data_pool->getReadSpace())<=0){
+        usleep(50000);
+//        qDebug()<<"mDataPool no data can read need"<<buf_size;
     }
-    return MainWindow::video_compressed_data_pool->Read((char*)buf,buf_size);
+    return MainWindow::video_compressed_data_pool->Read((char*)buf,buf_size>available?available:buf_size);
 }
 
 int64_t seek_buffer(void* opaque, int64_t offset, int whence)
@@ -30,11 +37,16 @@ VideoDec::VideoDec(QObject *parent) :
 }
 void VideoDec::init()
 {
+    play();
+}
+
+void VideoDec::play()
+{
     avcodec_register_all();
     av_register_all();
     pFormatCtx = avformat_alloc_context();
     unsigned char *aviobuffer=(unsigned char *)av_malloc(32768);
-    AVIOContext *avio =avio_alloc_context(aviobuffer, 32768,0,NULL,read_buffer,NULL,NULL);
+    avio =avio_alloc_context(aviobuffer, 32768,0,NULL,read_buffer,NULL,NULL);
     pFormatCtx->pb=avio;
     pFormatCtx->flags = AVFMT_FLAG_CUSTOM_IO;
 
@@ -66,11 +78,7 @@ void VideoDec::init()
     }
     pFrame = avcodec_alloc_frame();
     pFrameRGB = avcodec_alloc_frame();
-    play();
-}
 
-void VideoDec::play()
-{
     int got_picture;
     av_new_packet(&packet, pCodecCtx->width*pCodecCtx->height);
 
@@ -79,11 +87,14 @@ void VideoDec::play()
     uint8_t *out_buffer;
     out_buffer = new uint8_t[avpicture_get_size(PIX_FMT_RGB32, deskrect.width(),deskrect.height())];//分配AVFrame所需内存
 
-    avpicture_fill((AVPicture *)pFrameRGB, out_buffer, PIX_FMT_RGB32, deskrect.width(),deskrect.height());//填充AVFrame
+//    avpicture_fill((AVPicture *)pFrameRGB, out_buffer, PIX_FMT_RGB32, deskrect.width(),deskrect.height());//填充AVFrame
+    avpicture_fill((AVPicture *)pFrameRGB, out_buffer, PIX_FMT_RGB32, pCodecCtx->width, pCodecCtx->height);//填充AVFrame
     avpicture_fill((AVPicture *)pFrame, out_buffer, PIX_FMT_RGB32, pCodecCtx->width, pCodecCtx->height);//填充AVFrame
 
+//    SwsContext *convertCtx = sws_getContext(pCodecCtx->width,pCodecCtx->height,pCodecCtx->pix_fmt,
+//                                            deskrect.width(),deskrect.height(),PIX_FMT_RGB32,SWS_FAST_BILINEAR,NULL,NULL,NULL);
     SwsContext *convertCtx = sws_getContext(pCodecCtx->width,pCodecCtx->height,pCodecCtx->pix_fmt,
-                                            deskrect.width(),deskrect.height(),PIX_FMT_RGB32,SWS_FAST_BILINEAR,NULL,NULL,NULL);
+                                            pCodecCtx->width,pCodecCtx->height,PIX_FMT_RGB32,SWS_FAST_BILINEAR,NULL,NULL,NULL);
     bool needadd = true;
     while(!exitFlag && av_read_frame(pFormatCtx,&packet)>=0){
         if(packet.stream_index == videoindex){
@@ -92,7 +103,8 @@ void VideoDec::play()
                 if(needadd){
                     sws_scale(convertCtx,(const uint8_t*  const*)pFrame->data,pFrame->linesize,0
                               ,pCodecCtx->height,pFrameRGB->data,pFrameRGB->linesize);
-                    QImage img((uchar *)pFrameRGB->data[0],deskrect.width(),deskrect.height(),QImage::Format_RGB32);
+//                    QImage img((uchar *)pFrameRGB->data[0],deskrect.width(),deskrect.height(),QImage::Format_RGB32);
+                    QImage img((uchar *)pFrameRGB->data[0],pCodecCtx->width,pCodecCtx->height,QImage::Format_RGB32);
                     mutex.lock();
                     videoImg.append(img);
                     mutex.unlock();
@@ -103,7 +115,12 @@ void VideoDec::play()
             }
             av_free_packet(&packet);
         }
-//        usleep(100);
+        usleep(100);
     }
     sws_freeContext(convertCtx);
+//    avcodec_close(pCodecCtx);
+//    av_free(pFrame);
+//    av_free(pFrameRGB);
+//    avio_close(avio);
+//    avformat_free_context(pFormatCtx);
 }

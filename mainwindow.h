@@ -88,6 +88,8 @@ public slots:
     void receive_file_data();
 
 private:
+    int window_width;
+    int window_height;
     Ui::MainWindow *ui;
     QVBoxLayout *mainLayout;
     QPushButton *closeButton;
@@ -120,7 +122,9 @@ private:
     QLabel *videoShow;
     QLabel *videoShowTips;
 //    CPlayWidget *gl;
-    bool startflag;
+    bool mVideoStartPlayFlag;
+    quint32  mVideoDataFileTotalBytes;
+    quint32  mVideoDataFileReceived;
 
     //setup
     int device_setup_port;

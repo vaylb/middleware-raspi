@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include "mainwindow.h"
 #include <QMutex>
+#include <alsa/asoundlib.h>
 
 class MainWindow;
 
@@ -23,6 +24,7 @@ public:
     int mAudioChannels;
     int mAudioFrequency;
     int mAudioFramebits;
+//    static snd_pcm_t* handle;
 };
 
 #endif // AUDIOPLAYER_H

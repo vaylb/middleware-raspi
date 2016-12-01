@@ -7,23 +7,22 @@ extern "C"
 }
 
 int read_buffer_audio(void *opaque, uint8_t *buf, int buf_size){
-    while(MainWindow::mDataPool->getReadSpace()<buf_size){
+    int available;
+    while((available = MainWindow::mDataPool->getReadSpace())<=0){
         usleep(50000);
-//        qDebug()<<"mDataPool no data can read "<<MainWindow::mDataPool->getReadSpace();
+//        qDebug()<<"mDataPool no data can read need"<<buf_size;
     }
-    return MainWindow::mDataPool->Read((char*)buf,buf_size);
+    return MainWindow::mDataPool->Read((char*)buf,buf_size>available?available:buf_size);
 }
 
 AudioDec::AudioDec(QObject *parent) :
     QObject(parent),
     mExitFlag(false)
 {
-    qDebug()<<"AudioDec constructor";
 }
 void AudioDec::decode()
 {
-    qDebug()<<"------------------ audio_decode_thread run --------------------";
-    avcodec_register_all();/*注册所有的编码解码器*/
+//    qDebug()<<"------------------ audio_decode_thread run --------------------";
     av_register_all();
     AVFormatContext *pFormatCtx;
     AVCodec *aCodec;
@@ -102,7 +101,7 @@ void AudioDec::decode()
                 len = avcodec_decode_audio3(aCodecCtx,(short *)outbuf, &out_size,&packet);
                 if (len < 0)
                 {
-                    printf("error len\n");
+                    qDebug()<<"avcodec_decode_audio3 error len";
                     break;
                 }
                 if (out_size > 0)
@@ -117,12 +116,10 @@ void AudioDec::decode()
                 pktdata += len;
             }
         }
-        // Free the packet that was allocated by av_read_frame
         av_free_packet(&packet);
         usleep(2000);
     }
-    qDebug()<<"audio decode exit";
-
+    qDebug()<<"--------------audio decode exit--------------";
     free(outbuf);
     avcodec_close(aCodecCtx);
     av_free(aCodecCtx);

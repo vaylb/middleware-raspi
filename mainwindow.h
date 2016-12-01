@@ -165,6 +165,7 @@ public:
     static DataBuffer *video_compressed_data_pool; //holds video data
     static DataBuffer *mDataPool; //holds audio data that are not decoded
     static DataBuffer *mPcmPool; //holds audio pcm data that are decoded from mDataPool
+    static QMutex mDataPoolMutex;
 
 private:
     QString transfer;

@@ -151,14 +151,8 @@ void MainWindow::device_scan_come()
             get_mac(mac);
             mac[17] = '\0';
 
-            QByteArray msg;
-            if(type == DEVICE_AUDIO){
-                msg = "{\"name\":\"01\",\"type\":0}";
-            }else if (type == DEVICE_VIDEO){
-                msg = "{\"name\":\"01\",\"type\":1}";
-            }else {
-                msg = "{\"name\":\"01\",\"type\":2}";
-            }
+            QByteArray msg="{\"name\":\"01\",\"type\":2}";
+            msg.replace(20,1,QString::number(type).toStdString().c_str());
             msg.replace(9,2,mac);
 
             QUdpSocket *device_scan_join_up = new QUdpSocket(this);
@@ -451,32 +445,81 @@ void MainWindow::receive_setup_data(){
 }
 
 void MainWindow::receive_audio_data(){
-    if(!mAudioDataFileFlag){
+//    if(!mAudioDataFileFlag){
+//        qint32 available = audio_data_receiver->bytesAvailable();
+//        qint32 data_pool_can_write  = 0;
+//        while((data_pool_can_write = mDataPool->getWriteSpace()) <=0){
+//            usleep(2000);
+//        }
+
+//        if(data_pool_can_write==0) {
+//    //        qDebug()<<"new data but datapool can not write, can read "<<mDataPool->getReadSpace();
+//            return;
+//        }
+
+//        qint32 read_temp = available>data_pool_can_write?data_pool_can_write:available;
+//        if(read_temp>4096){
+//            read_temp = 4096;
+//        }
+//        audioInBlock = audio_data_receiver->read(read_temp);
+//        mDataPool->Write(audioInBlock.data(),read_temp);
+//        audioInBlock.resize(0);
+//        //qDebug() <<"data available:"<<available<<", datapool has:"<<video_compressed_data_pool->getReadSpace();
+
+//        if(!mAudioStartFlag && mDataPool->getReadSpace()>4096*8){
+//            mAudioStartFlag = true;
+//            audioPlayThread = new QThread(this);
+//            mAudioPlayer->moveToThread(audioPlayThread);
+
+//            connect(this,SIGNAL(audio_play_s()),mAudioPlayer,SLOT(play()));
+//            audioPlayThread->start();
+//            emit audio_play_s();
+
+//            if(mKAudioType == TYPE_AAC){
+//                audioDecodeThread = new QThread(this);
+//                mAudioDec->moveToThread(audioDecodeThread);
+//                connect(this,SIGNAL(decode_s()),mAudioDec,SLOT(decode()));
+//                audioDecodeThread->start();
+//                emit decode_s();
+//            }
+//        }
+//    }else
+    if(mAudioDataFileFlag){
+        if(mAudioDataFileReceived < sizeof(quint32)){
+            QDataStream *instream = new QDataStream(audio_data_receiver);
+            if((audio_data_receiver->bytesAvailable() >= sizeof(quint32))){
+                *instream >> mAudioDataFileTotalBytes;
+                mAudioDataFileReceived += sizeof(quint32);
+                qDebug() <<"receive new audio file size:"<<mAudioDataFileTotalBytes;
+            }
+            return;
+        }
+    }
+    while(mAudioPlayer != NULL && !mAudioPlayer->mExitFlag && audio_data_receiver->bytesAvailable()>0){
         qint32 available = audio_data_receiver->bytesAvailable();
         qint32 data_pool_can_write  = 0;
         while((data_pool_can_write = mDataPool->getWriteSpace()) <=0){
-            usleep(2000);
-        }
-
-        if(data_pool_can_write==0) {
-    //        qDebug()<<"new data but datapool can not write, can read "<<mDataPool->getReadSpace();
-            return;
+            usleep(100000);
         }
 
         qint32 read_temp = available>data_pool_can_write?data_pool_can_write:available;
-        if(read_temp>4096){
-            read_temp = 4096;
+        if(read_temp > 0){
+            if(mAudioDataFileFlag){
+                if(mAudioDataFileReceived+read_temp > mAudioDataFileTotalBytes){
+                    read_temp = mAudioDataFileTotalBytes-mAudioDataFileReceived;
+                }
+                mAudioDataFileReceived += read_temp;
+            }
+            //logDebug("receive data:"+QString::number(read_temp));
+            audioInBlock = audio_data_receiver->read(read_temp);
+            mDataPool->Write(audioInBlock.data(),read_temp);
+            audioInBlock.resize(0);
         }
-        audioInBlock = audio_data_receiver->read(read_temp);
-        mDataPool->Write(audioInBlock.data(),read_temp);
-        audioInBlock.resize(0);
-        //qDebug() <<"data available:"<<available<<", datapool has:"<<video_compressed_data_pool->getReadSpace();
 
         if(!mAudioStartFlag && mDataPool->getReadSpace()>4096*8){
             mAudioStartFlag = true;
             audioPlayThread = new QThread(this);
             mAudioPlayer->moveToThread(audioPlayThread);
-
             connect(this,SIGNAL(audio_play_s()),mAudioPlayer,SLOT(play()));
             audioPlayThread->start();
             emit audio_play_s();
@@ -489,64 +532,10 @@ void MainWindow::receive_audio_data(){
                 emit decode_s();
             }
         }
-    }else{
-        if(mAudioDataFileReceived < sizeof(quint32)){
-            QDataStream *instream = new QDataStream(audio_data_receiver);
-            if((audio_data_receiver->bytesAvailable() >= sizeof(quint32))){
-                *instream >> mAudioDataFileTotalBytes;
-                mAudioDataFileReceived += sizeof(quint32);
-                qDebug() <<"receive new audio file size:"<<mAudioDataFileTotalBytes;
-            }
-            return;
-        }
-        while(audio_data_receiver->bytesAvailable()>0){
-            qint32 available = audio_data_receiver->bytesAvailable();
-            qint32 data_pool_can_write  = 0;
-            while((data_pool_can_write = mDataPool->getWriteSpace()) <=0){
-                logDebug("mDataPool full wait 80000");
-                usleep(100000);
-            }
 
-            if(data_pool_can_write==0) {
-        //        qDebug()<<"new data but datapool can not write, can read "<<mDataPool->getReadSpace();
-                return;
-            }
-
-            qint32 read_temp = available>data_pool_can_write?data_pool_can_write:available;
-            if(read_temp>4096){
-                read_temp = 4096;
-            }
-
-            if(mAudioDataFileFlag){
-                if(mAudioDataFileReceived+read_temp > mAudioDataFileTotalBytes){
-                    read_temp = mAudioDataFileTotalBytes-mAudioDataFileReceived;
-                }
-                mAudioDataFileReceived += read_temp;
-            }
-            logDebug("receive data:"+QString::number(read_temp));
-            audioInBlock = audio_data_receiver->read(read_temp);
-            mDataPool->Write(audioInBlock.data(),read_temp);
-            audioInBlock.resize(0);
-            //qDebug() <<"data available:"<<available<<", datapool has:"<<video_compressed_data_pool->getReadSpace();
-
-            if(!mAudioStartFlag && mDataPool->getReadSpace()>4096*8){
-                mAudioStartFlag = true;
-                audioPlayThread = new QThread(this);
-                mAudioPlayer->moveToThread(audioPlayThread);
-                connect(this,SIGNAL(audio_play_s()),mAudioPlayer,SLOT(play()));
-                audioPlayThread->start();
-                emit audio_play_s();
-
-                if(mKAudioType == TYPE_AAC){
-                    audioDecodeThread = new QThread(this);
-                    mAudioDec->moveToThread(audioDecodeThread);
-                    connect(this,SIGNAL(decode_s()),mAudioDec,SLOT(decode()));
-                    audioDecodeThread->start();
-                    emit decode_s();
-                }
-            }
-            if(mAudioDataFileReceived == mAudioDataFileTotalBytes){
-                qDebug() <<"audio file receive success";
+        if(mAudioDataFileFlag){
+            if(mAudioDataFileReceived == mAudioDataFileTotalBytes && mPcmPool->getReadSpace() == 0){
+                qDebug() <<"audio playback complete";
                 mAudioDataFileReceived = 0;
                 mAudioDataFileTotalBytes = 0;
                 audio_data_receiver->readAll();
@@ -567,11 +556,12 @@ void MainWindow::receive_audio_data(){
                 audioDecodeThread = NULL;
                 mDataPool->Reset();
                 mPcmPool->Reset();
-            }else if(mAudioDataFileReceived < mAudioDataFileTotalBytes){
+            }else{
+                usleep(10000);
                 emit audio_data_receiver->readyRead();
             }
         }
-
+        usleep(2000);
     }
 }
 
@@ -711,15 +701,19 @@ int MainWindow::get_mac(char* mac){
 }
 
 int MainWindow::getDeviceType(){
-    return DEVICE_PRINTER;
-//    system("sudo tvservice -d /home/pi/edid/edid_hdmi_plugin_test.txt");
-//    QFile file("/home/pi/edid/edid_hdmi_plugin_test.txt");
-//    if(file.exists()){
-//        system("sudo rm /home/pi/edid/edid_hdmi_plugin_test.txt");
-//        return DEVICE_VIDEO;
-//    }else{
-//        return DEVICE_AUDIO;
-//    }
+    int res = 1;
+    QFile printer("/dev/usb/lp0"); //if file /dev/usb/lp0 exists then some printer are in plugin&turn on status
+    if(printer.exists()){
+        res |= 1<<2;
+    }
+
+    system("sudo tvservice -d /home/pi/edid/edid_hdmi_plugin_test.txt");
+    QFile file("/home/pi/edid/edid_hdmi_plugin_test.txt");
+    if(file.exists()){
+        system("sudo rm /home/pi/edid/edid_hdmi_plugin_test.txt");
+        res |= 1<<1;
+    }
+    return res;
 }
 
 void MainWindow::logDebug(QString msg){

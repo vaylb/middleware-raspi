@@ -433,7 +433,6 @@ void MainWindow::showVideo()
         }
         return;
     }
-//    logDebug("read space size:"+QString::number(video_compressed_data_pool->getReadSpace())+", videoImg size:"+QString::number(mVideoDec->videoImg.size()));
     if(mVideoDataFileTotalBytes >0 && mVideoDataFileReceived == mVideoDataFileTotalBytes && video_compressed_data_pool->getReadSpace() == 0 && mVideoDec->videoImg.size() <= 1){
         logDebug("video file playback complete");
         mVideoStartPlayFlag = false;
@@ -461,7 +460,9 @@ void MainWindow::showVideo()
     mVideoDec->mutex.lock();
     pix = pix.fromImage(mVideoDec->videoImg.dequeue());
     mVideoDec->mutex.unlock();
+//    pix = pix.scaled(QSize(window_width,window_height),Qt::KeepAspectRatio, Qt::SmoothTransformation);
     videoShow->setFixedSize(window_width,window_height);
+    videoShow->setScaledContents(true);
     videoShow->setPixmap(pix);
 }
 

@@ -66,6 +66,9 @@ MainWindow::MainWindow(QWidget *parent) :
     printscreeninfo();
 
     startListening();
+//    glplay();
+//      gl = new CPlayWidget(this);
+//      gl->PlayOneFrame();
 }
 
 MainWindow::~MainWindow()
@@ -223,6 +226,7 @@ void MainWindow::device_scan_come()
             videoShowTips->setHidden(false);
             videoShowTips->setText("播放结束");
             videoShowTips->setAlignment(Qt::AlignCenter|Qt::AlignTop);
+
 
             mShowJpegFlag = false;
             if(mVideoDec != NULL){
@@ -394,23 +398,9 @@ void MainWindow::receive_compressed_video_data()
 
         if(mVideoDataFileReceived == mVideoDataFileTotalBytes){ //&& video_compressed_data_pool->getReadSpace() == 0
             qDebug() <<"video playback complete, media size:"+QString::number(mVideoDataFileReceived);
-//            mVideoDataFileReceived = 0;
-//            mVideoDataFileTotalBytes = 0;
             video_compressed_data_receiver->readAll();
             video_compressed_data_receiver->close();
-//            sendMessage(getJobDoneMsg());
 
-//            mVideoStartPlayFlag = false;
-//            mAudioPlayBackFlag = false;
-//            mAudioDataFileFlag = false;
-//            readTimer->stop();
-//            mVideoDec->videoImg.clear();
-//            mVideoDec->exitFlag = true;
-//            videoDecThread->exit();
-
-//            mVideoDec = NULL;
-//            videoDecThread = NULL;
-//            video_compressed_data_pool->Reset();
         }else{
 //            qDebug() <<"video playback emit ready signal, current size:"+QString::number(mVideoDataFileReceived);
             usleep(100000);
@@ -425,15 +415,7 @@ void MainWindow::showVideo()
         return;
     }
 
-    if(mVideoDec->exitFlag || mVideoDec->videoImg.isEmpty()) {
-        if(mVideoDec->exitFlag){
-            qDebug()<<"video show stop";
-            readTimer->stop();
-            mVideoDec->videoImg.clear();
-        }
-        return;
-    }
-    if(mVideoDataFileTotalBytes >0 && mVideoDataFileReceived == mVideoDataFileTotalBytes && video_compressed_data_pool->getReadSpace() == 0 && mVideoDec->videoImg.size() <= 1){
+    if(mVideoDataFileTotalBytes >0 && mVideoDataFileReceived == mVideoDataFileTotalBytes && video_compressed_data_pool->getReadSpace() == 0){
         logDebug("video file playback complete");
         mVideoStartPlayFlag = false;
         mVideoDataFileReceived = 0;
@@ -456,6 +438,16 @@ void MainWindow::showVideo()
         videoShowTips->setAlignment(Qt::AlignCenter|Qt::AlignTop);
         return;
     }
+
+    if(mVideoDec->exitFlag || mVideoDec->videoImg.isEmpty()) {
+        if(mVideoDec->exitFlag){
+            qDebug()<<"video show stop";
+            readTimer->stop();
+            mVideoDec->videoImg.clear();
+        }
+        return;
+    }
+
     QPixmap pix;
     mVideoDec->mutex.lock();
     pix = pix.fromImage(mVideoDec->videoImg.dequeue());
@@ -793,4 +785,54 @@ int MainWindow::getDeviceType(){
 
 void MainWindow::logDebug(QString msg){
     qDebug()<<"logDebug:"<<msg.toStdString().c_str();
+}
+
+void MainWindow::glplay(){
+//    GlPlayer* glplayer = new GlPlayer(1024, 638);
+////    glplayer->esMainLoop();
+//    int width,height;
+//    char *buffer = NULL;
+//    FILE *f;
+//    unsigned char tgaheader[12];
+//    unsigned char attributes[6];
+//    unsigned int imagesize;
+
+//    f = fopen("jan.tga", "rb");
+//    if(f == NULL) return;
+
+//    if(fread(&tgaheader, sizeof(tgaheader), 1, f) == 0)
+//    {
+//        fclose(f);
+//        return;
+//    }
+
+//    if(fread(attributes, sizeof(attributes), 1, f) == 0)
+//    {
+//        fclose(f);
+//        return;
+//    }
+
+//    width = attributes[1] * 256 + attributes[0];
+//    height = attributes[3] * 256 + attributes[2];
+//    imagesize = attributes[4] / 8 * width * height;
+//    //imagesize *= 4/3;
+//    printf("Origin bits: %d\n", attributes[5] & 030);
+//    printf("Pixel depth %d\n", attributes[4]);
+//    buffer = (char*)malloc(imagesize);
+//    if (buffer == NULL)
+//    {
+//        fclose(f);
+//        return;
+//    }
+//    // invert - should be reflect, easier is 180 rotate
+//    int n = 1;
+//    while (n <= imagesize) {
+//        fread(&buffer[imagesize - n], 1, 1, f);
+//        n++;
+//    }
+
+//    fclose(f);
+//    glplayer->Draw(buffer);
+//    sleep(5);
+//    glplayer->clear();
 }

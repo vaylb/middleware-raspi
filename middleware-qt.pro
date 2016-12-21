@@ -11,6 +11,31 @@ greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 TARGET = middleware-qt
 TEMPLATE = app
 
+DEFINES += USE_OPENGL \
+        USE_EGL \
+        IS_RPI \
+        STANDALONE \
+        __STDC_CONSTANT_MACROS \
+        __STDC_LIMIT_MACROS \
+        TARGET_POSIX \
+        _LINUX \
+        _REENTRANT \
+        _LARGEFILE64_SOURCE \
+        _FILE_OFFSET_BITS=64 \
+        HAVE_LIBOPENMAX=2 \
+        OMX \
+        OMX_SKIP64BIT \
+        USE_EXTERNAL_OMX \
+        HAVE_LIBBCM_HOST \
+        USE_EXTERNAL_LIBBCM_HOST \
+        USE_VCHIQ_ARM \
+
+INCLUDEPATH += /opt/vc/include/ \
+        /opt/vc/include/interface/vcos/pthreads \
+        /opt/vc/include/interface/vmcs_host/linux \
+        /opt/vc/src/hello_pi/libs/ilclient \
+        /opt/vc/src/hello_pi/libs/vgfont \
+
 
 SOURCES += main.cpp\
         mainwindow.cpp \
@@ -18,18 +43,23 @@ SOURCES += main.cpp\
     videodec.cpp \
     jpegresize.cpp \
     AudioPlayer.cpp \
-    AudioDec.cpp
+    AudioDec.cpp \
+    GlPlayer.cpp
 
 HEADERS  += mainwindow.h \
     DataBuffer.h \
     videodec.h \
     jpegresize.h \
     audioplayer.h \
-    audiodec.h
+    audiodec.h \
+    glplayer.h
 
 FORMS    += mainwindow.ui
 
-LIBS += -lasound \
+LIBS += -L/opt/vc/lib/ \
+        -lGLESv2 -lEGL -lbcm_host -lvcos -lvchiq_arm -lpthread -lrt \
+        -L/opt/vc/src/hello_pi/libs/vgfont -ldl \
+        -lasound \
         -lavcodec \
         -lavdevice \
         -lavfilter \
@@ -39,6 +69,7 @@ LIBS += -lasound \
         -lswscale \
         -lavutil \
         -lvorbis \
-        -lm -lz -lfaac -lmp3lame \
         -lx264 -ltheoraenc -ltheoradec -lxvidcore -lvorbisfile -lvorbisenc \
+        -lm -lz -lfaac -lmp3lame
+
 

@@ -11,11 +11,14 @@
 #include "jpegresize.h"
 #include "audioplayer.h"
 #include "audiodec.h"
+#include "glplayer.h"
+#include "PlayWidget.h"
 
 class VideoDec;
 class JpegResize;
 class AudioPlayer;
 class AudioDec;
+class CPlayWidget;
 
 namespace Ui {
 class MainWindow;
@@ -44,6 +47,7 @@ public:
     explicit MainWindow(QWidget *parent = 0);
     ~MainWindow();
     int get_mac(char* mac);
+    void glplay();
 
 private slots:
     void on_pushButton_clicked();
@@ -175,6 +179,9 @@ private:
     QString transfer;
     QString temp[20];
     QString wifiName[20];
+
+public:
+    CPlayWidget *gl;
 
 };
 

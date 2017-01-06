@@ -29,8 +29,9 @@ DEFINES += USE_OPENGL \
         HAVE_LIBBCM_HOST \
         USE_EXTERNAL_LIBBCM_HOST \
         USE_VCHIQ_ARM \
+        AVCODEC_MAX_AUDIO_FRAME_SIZE=192000
 
-INCLUDEPATH += /opt/vc/include/ \
+INCLUDEPATH += /opt/vc/include \
         /opt/vc/include/interface/vcos/pthreads \
         /opt/vc/include/interface/vmcs_host/linux \
         /opt/vc/src/hello_pi/libs/ilclient \
@@ -38,13 +39,14 @@ INCLUDEPATH += /opt/vc/include/ \
 
 
 SOURCES += main.cpp\
-        mainwindow.cpp \
+    OMXH264Player.cpp \
+    mainwindow.cpp \
     DataBuffer.cpp \
     videodec.cpp \
     jpegresize.cpp \
     AudioPlayer.cpp \
     AudioDec.cpp \
-    GlPlayer.cpp
+    GlPlayer.cpp \
 
 HEADERS  += mainwindow.h \
     DataBuffer.h \
@@ -52,12 +54,15 @@ HEADERS  += mainwindow.h \
     jpegresize.h \
     audioplayer.h \
     audiodec.h \
-    glplayer.h
+    glplayer.h \
+    OMXH264Player.h
 
 FORMS    += mainwindow.ui
 
-LIBS += -L/opt/vc/lib/ \
-        -lGLESv2 -lEGL -lbcm_host -lvcos -lvchiq_arm -lpthread -lrt \
+LIBS += -L/opt/vc/src/hello_pi/libs/ilclient \
+        -lilclient \
+        -L/opt/vc/lib \
+        -lGLESv2 -lEGL -lopenmaxil -lbcm_host -lvcos -lvchiq_arm -lpthread -lrt \
         -L/opt/vc/src/hello_pi/libs/vgfont -ldl \
         -lasound \
         -lavcodec \

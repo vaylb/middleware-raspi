@@ -32,9 +32,10 @@ int64_t seek_buffer(void* opaque, int64_t offset, int whence)
 
 VideoDec::VideoDec(QObject *parent) :
     QObject(parent),
-    exitFlag(false)
+    exitFlag(false),
+    mAudioPlayThread(NULL),
+    mAudioPlayer(NULL)
 {
-//    GlPlayer::getPlayer(1920,1080);
 }
 void VideoDec::init()
 {
@@ -43,6 +44,8 @@ void VideoDec::init()
 
 void VideoDec::play()
 {
+    int len;
+    uint8_t * outbuf = (uint8_t*)malloc(AVCODEC_MAX_AUDIO_FRAME_SIZE);
     avcodec_register_all();
     av_register_all();
     pFormatCtx = avformat_alloc_context();
@@ -66,22 +69,49 @@ void VideoDec::play()
         }
     }
     if(videoindex == -1){
-        qDebug()<<"Din't find video stream";
+        qDebug()<<"Didn't find video stream";
     }
 
-    pCodecCtx = pFormatCtx->streams[videoindex]->codec;
-    pCodec = avcodec_find_decoder(pCodecCtx->codec_id);
-    if(pCodec == NULL){
-        qDebug()<<"codec not find";
+    audioindex = -1;
+    for(int i=0; i< pFormatCtx->nb_streams; i++){
+        if(pFormatCtx->streams[i]->codec->codec_type == AVMEDIA_TYPE_AUDIO){
+            audioindex = i;
+            break;
+        }
     }
-    if(avcodec_open2(pCodecCtx,pCodec,NULL)<0){
-        qDebug()<<"can't open codec";
+    if(audioindex == -1)
+    {
+        qDebug()<<"Didn't find a audio stream";
     }
+
+    pCodecCtxVideo = pFormatCtx->streams[videoindex]->codec;
+    pCodecVideo = avcodec_find_decoder(pCodecCtxVideo->codec_id);
+    if(pCodecVideo == NULL){
+        qDebug()<<"codec video not find";
+    }
+    if(avcodec_open2(pCodecCtxVideo,pCodecVideo,NULL)<0){
+        qDebug()<<"can't open codec video";
+    }
+
+    pCodecCtxAudio = pFormatCtx->streams[audioindex]->codec;
+    pCodecAudio = avcodec_find_decoder(pCodecCtxAudio->codec_id);
+    if(!pCodecAudio)
+    {
+        qDebug()<<"Unsupported codec!";
+        return;
+    }
+    // Open adio codec
+    if(avcodec_open2(pCodecCtxAudio, pCodecAudio,NULL)<0)
+    {
+        qDebug()<<"Could not open codec";
+        return;
+    }
+
     pFrame = avcodec_alloc_frame();
     pFrameRGB = avcodec_alloc_frame();
 
     int got_picture;
-    av_new_packet(&packet, pCodecCtx->width*pCodecCtx->height);
+    av_new_packet(&packet, pCodecCtxVideo->width*pCodecCtxVideo->height);
 
     QDesktopWidget *dwsktopwidget = QApplication::desktop();
     QRect deskrect = dwsktopwidget->availableGeometry();
@@ -89,23 +119,37 @@ void VideoDec::play()
     out_buffer = new uint8_t[avpicture_get_size(PIX_FMT_RGB32, deskrect.width(),deskrect.height())];//分配AVFrame所需内存
 
 //    avpicture_fill((AVPicture *)pFrameRGB, out_buffer, PIX_FMT_RGB32, deskrect.width(),deskrect.height());//填充AVFrame
-    avpicture_fill((AVPicture *)pFrameRGB, out_buffer, PIX_FMT_RGB32, pCodecCtx->width, pCodecCtx->height);//填充AVFrame
-    avpicture_fill((AVPicture *)pFrame, out_buffer, PIX_FMT_RGB32, pCodecCtx->width, pCodecCtx->height);//填充AVFrame
+    avpicture_fill((AVPicture *)pFrameRGB, out_buffer, PIX_FMT_RGB32, pCodecCtxVideo->width, pCodecCtxVideo->height);//填充AVFrame
+    avpicture_fill((AVPicture *)pFrame, out_buffer, PIX_FMT_RGB32, pCodecCtxVideo->width, pCodecCtxVideo->height);//填充AVFrame
 
 //    SwsContext *convertCtx = sws_getContext(pCodecCtx->width,pCodecCtx->height,pCodecCtx->pix_fmt,
 //                                            deskrect.width(),deskrect.height(),PIX_FMT_RGB32,SWS_FAST_BILINEAR,NULL,NULL,NULL);
-    SwsContext *convertCtx = sws_getContext(pCodecCtx->width,pCodecCtx->height,pCodecCtx->pix_fmt,
-                                            pCodecCtx->width,pCodecCtx->height,PIX_FMT_BGR32,SWS_FAST_BILINEAR,NULL,NULL,NULL);
+    SwsContext *convertCtx = sws_getContext(pCodecCtxVideo->width,pCodecCtxVideo->height,pCodecCtxVideo->pix_fmt,
+                                            pCodecCtxVideo->width,pCodecCtxVideo->height,PIX_FMT_BGR32,SWS_FAST_BILINEAR,NULL,NULL,NULL);
     bool needadd = true;
-    GlPlayer* glplayer = new GlPlayer(pCodecCtx->width,pCodecCtx->height);
-    qDebug()<<"-------decodec video size:"<<pCodecCtx->width<<"x"<<pCodecCtx->height<<"-------";
+//    GlPlayer* glplayer = new GlPlayer(pCodecCtxVideo->width,pCodecCtxVideo->height);
+    OMXH264Player* h264player = new OMXH264Player();
+    qDebug()<<"-------decodec video size:"<<pCodecCtxVideo->width<<"x"<<pCodecCtxVideo->height<<"-------";
+    bool first = true;
+    AVBitStreamFilterContext* bsfc = av_bitstream_filter_init("h264_mp4toannexb");
     while(!exitFlag && av_read_frame(pFormatCtx,&packet)>=0){
         if(packet.stream_index == videoindex){
-            int rec = avcodec_decode_video2(pCodecCtx,pFrame,&got_picture,&packet);
+            if(first){
+//                first = false;
+                av_bitstream_filter_filter(bsfc, pCodecCtxVideo, NULL, &packet.data, &packet.size, packet.data, packet.size, 0);
+//                h264player->draw(pCodecCtxVideo->extradata, pCodecCtxVideo->extradata_size);
+                h264player->draw(packet.data, packet.size);
+            }else h264player->draw(packet.data, packet.size);
+//            char nalFlag[4] = {0x00,0x00,0x00,0x01};
+//            memcpy(packet.data, nalFlag,4);
+//            h264player->draw(packet.data, packet.size);
+
+#if 0
+            int rec = avcodec_decode_video2(pCodecCtxVideo,pFrame,&got_picture,&packet);
             if(rec>0){
                 if(needadd){
                     sws_scale(convertCtx,(const uint8_t*  const*)pFrame->data,pFrame->linesize,0
-                              ,pCodecCtx->height,pFrameRGB->data,pFrameRGB->linesize);
+                              ,pCodecCtxVideo->height,pFrameRGB->data,pFrameRGB->linesize);
 //                    QImage img((uchar *)pFrameRGB->data[0],deskrect.width(),deskrect.height(),QImage::Format_RGB32);
 //                    GlPlayer::getPlayer(pCodecCtx->width,pCodecCtx->height)->Draw((char *)pFrameRGB->data[0]);
                     glplayer->draw((char *)pFrameRGB->data[0]);
@@ -121,11 +165,52 @@ void VideoDec::play()
                 }
             }
             av_free_packet(&packet);
+#endif
+        }else if(packet.stream_index == audioindex){
+#if 1
+            uint8_t *pktdata;
+            int pktsize;
+            pktdata = packet.data;
+            pktsize = packet.size;
+            while(pktsize > 0)
+            {
+
+                int out_size = AVCODEC_MAX_AUDIO_FRAME_SIZE;
+                len = avcodec_decode_audio3(pCodecCtxAudio,(short *)outbuf, &out_size,&packet);
+                if (len < 0)
+                {
+                    qDebug()<<"avcodec_decode_audio3 error len";
+                    break;
+                }
+                if (out_size > 0)
+                {
+                    while(!exitFlag && MainWindow::mPcmPool->getWriteSpace()<out_size) {
+                        usleep(100000);
+                    }
+//                    qDebug()<<"write %d to pool "<<out_size;
+                    MainWindow::mPcmPool->Write((char*)outbuf,out_size);
+                    if(mAudioPlayer == NULL){
+                        mAudioPlayer = new AudioPlayer(2, 44100);
+                        mAudioPlayThread = new QThread(this);
+                        mAudioPlayer->moveToThread(mAudioPlayThread);
+                        connect(this,SIGNAL(audio_play_s()),mAudioPlayer,SLOT(play()));
+                        mAudioPlayThread->start();
+                        emit audio_play_s();
+                    }
+                }
+                pktsize -= len;
+                pktdata += len;
+            }
+#endif
         }
         usleep(100);
     }
+    free(outbuf);
+    h264player->clear();
+//    delete h264player;
+    av_bitstream_filter_close(bsfc);
     sws_freeContext(convertCtx);
-    delete glplayer;
+//    delete glplayer;
 
 //    avcodec_close(pCodecCtx);
 //    av_free(pFrame);

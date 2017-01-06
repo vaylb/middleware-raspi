@@ -12,13 +12,14 @@
 #include "audioplayer.h"
 #include "audiodec.h"
 #include "glplayer.h"
-#include "PlayWidget.h"
+#include "OMXH264Player.h"
 
 class VideoDec;
 class JpegResize;
 class AudioPlayer;
 class AudioDec;
 class CPlayWidget;
+class OMXH264Player;
 
 namespace Ui {
 class MainWindow;
@@ -86,6 +87,7 @@ public slots:
 signals:
     void audio_play_s();
     void decode_s();
+    void h264_play_s();
 
 //file print
 public slots:

@@ -16,7 +16,9 @@ extern "C"{
 #include "mainwindow.h"
 #include <QMutex>
 
+
 class MainWindow;
+class AudioPlayer;
 
 class VideoDec : public QObject
 {
@@ -28,9 +30,12 @@ public:
         struct ImgPacket *next;
     };
     int videoindex;
+    int audioindex;
     AVFormatContext *pFormatCtx;
-    AVCodecContext *pCodecCtx;
-    AVCodec *pCodec;
+    AVCodecContext *pCodecCtxVideo;
+    AVCodec *pCodecVideo;
+    AVCodecContext *pCodecCtxAudio;
+    AVCodec *pCodecAudio;
     AVPacket packet;
     AVFrame *pFrame,*pFrameRGB;
     AVIOContext *avio;
@@ -39,8 +44,12 @@ public:
     volatile bool exitFlag;
     QMutex mutex;
 
+    QThread *mAudioPlayThread;
+    AudioPlayer * mAudioPlayer;
+
 signals:
     void SendImage(QImage img);
+    void audio_play_s();
 
 public slots:
     void init();

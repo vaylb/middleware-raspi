@@ -66,9 +66,15 @@ MainWindow::MainWindow(QWidget *parent) :
     printscreeninfo();
 
     startListening();
-//    glplay();
-//      gl = new CPlayWidget(this);
-//      gl->PlayOneFrame();
+
+    //test omx player
+//    QThread *H264PlayThread = new QThread(this);
+//    OMXH264Player* H264Player = new OMXH264Player();
+//    H264Player->moveToThread(H264PlayThread);
+
+//    connect(this,SIGNAL(h264_play_s()),H264Player,SLOT(playbackTest()));
+//    H264PlayThread->start();
+//    emit h264_play_s();
 }
 
 MainWindow::~MainWindow()

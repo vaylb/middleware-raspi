@@ -37,7 +37,7 @@ public:
     AVCodecContext *pCodecCtxAudio;
     AVCodec *pCodecAudio;
     AVPacket packet;
-    AVFrame *pFrame,*pFrameRGB;
+//    AVFrame *pFrame,*pFrameRGB;
     AVIOContext *avio;
     char *FileName;
     QQueue<QImage> videoImg;

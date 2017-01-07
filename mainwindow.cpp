@@ -384,7 +384,7 @@ void MainWindow::receive_compressed_video_data()
             inBlock.resize(0);
         }
 
-        if(!mVideoStartPlayFlag && video_compressed_data_pool->getReadSpace()>1024*256){
+        if(!mVideoStartPlayFlag && video_compressed_data_pool->getReadSpace()>1024*128){
             mVideoStartPlayFlag = true;
             if(videoDecThread == NULL){
                 videoDecThread = new QThread(this);

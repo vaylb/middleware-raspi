@@ -101,15 +101,19 @@ OMXH264Player::~OMXH264Player(){
     OMX_Deinit();
 
     ilclient_destroy(client);
+    qDebug()<<"OMXH264Player destructor";
 }
 
 void OMXH264Player::draw( unsigned char * image, int size){
+    qDebug()<<"write "<<size;
     unsigned int data_len = 0;
     omxbuf = ilclient_get_input_buffer(video_decode, 130, 1);
+    if(omxbuf == NULL){
+        return;
+    }
     unsigned char *dest = omxbuf->pBuffer;
     memcpy(dest, image, size);
     data_len = size;
-    qDebug()<<"write "<<data_len;
 
     if(port_settings_changed == 0 && (data_len > 0 && ilclient_remove_event(video_decode, OMX_EventPortSettingsChanged, 131, 0, 0, 1) == 0)){
         port_settings_changed = 1;

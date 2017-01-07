@@ -101,8 +101,12 @@ void AudioPlayer::play()
     while (!mExitFlag)
     {
         memset(buffer,0,sizeof(buffer));
-        while(MainWindow::mPcmPool->getReadSpace()<size){
+        while(!mExitFlag && MainWindow::mPcmPool->getReadSpace()<size){
+//            qDebug()<<"AudioPlayer pcmpool drain";
             usleep(100000);
+        }
+        if(mExitFlag){
+            break;
         }
         count++;
         ret = MainWindow::mPcmPool->Read(buffer,size);

@@ -409,7 +409,7 @@ void MainWindow::receive_compressed_video_data()
 
         }else{
 //            qDebug() <<"video playback emit ready signal, current size:"+QString::number(mVideoDataFileReceived);
-            usleep(100000);
+            usleep(10000);
             emit video_compressed_data_receiver->readyRead();
         }
     }

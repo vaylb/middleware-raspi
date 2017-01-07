@@ -87,25 +87,11 @@ OMXH264Player::OMXH264Player(QObject *parent):
 }
 
 OMXH264Player::~OMXH264Player(){
-    ilclient_disable_tunnel(tunnel);
-    ilclient_disable_tunnel(tunnel+1);
-    ilclient_disable_tunnel(tunnel+2);
-    ilclient_disable_port_buffers(video_decode, 130, NULL, NULL, NULL);
-    ilclient_teardown_tunnels(tunnel);
-
-    ilclient_state_transition(list, OMX_StateIdle);
-    ilclient_state_transition(list, OMX_StateLoaded);
-
-    ilclient_cleanup_components(list);
-
-    OMX_Deinit();
-
-    ilclient_destroy(client);
     qDebug()<<"OMXH264Player destructor";
 }
 
 void OMXH264Player::draw( unsigned char * image, int size){
-    qDebug()<<"write "<<size;
+//    qDebug()<<"write "<<size;
     unsigned int data_len = 0;
     omxbuf = ilclient_get_input_buffer(video_decode, 130, 1);
     if(omxbuf == NULL){
@@ -142,7 +128,7 @@ void OMXH264Player::playbackTest(){
     if((in = fopen("/home/pi/middleware/FaceTimeEveryDay.264", "rb")) == NULL)
         return;
     int read = 0;
-    while((read = fread(buffer, 1, 200, in))>0){
+    while((read = fread(buffer, 1, 2000, in))>0){
         draw(buffer, read);
     }
     clear();
@@ -160,4 +146,21 @@ void OMXH264Player::clear(){
         // need to flush the renderer to allow video_decode to disable its input port
         ilclient_flush_tunnels(tunnel, 0);
     }
+
+
+    ilclient_disable_tunnel(tunnel);
+    ilclient_disable_tunnel(tunnel+1);
+    ilclient_disable_tunnel(tunnel+2);
+    ilclient_disable_port_buffers(video_decode, 130, NULL, NULL, NULL);
+    ilclient_teardown_tunnels(tunnel);
+
+
+    ilclient_state_transition(list, OMX_StateIdle);
+    ilclient_state_transition(list, OMX_StateLoaded);
+
+    ilclient_cleanup_components(list);
+
+    OMX_Deinit();
+
+    ilclient_destroy(client);
 }

@@ -92,6 +92,10 @@ OMXH264Player::~OMXH264Player(){
 
 void OMXH264Player::draw( unsigned char * image, int size){
 //    qDebug()<<"write "<<size;
+    if(size > 81920){
+        qDebug()<<"write size larger than omxbuf size, largest 81920";
+        return;
+    }
     unsigned int data_len = 0;
     omxbuf = ilclient_get_input_buffer(video_decode, 130, 1);
     if(omxbuf == NULL){
@@ -146,7 +150,6 @@ void OMXH264Player::clear(){
         // need to flush the renderer to allow video_decode to disable its input port
         ilclient_flush_tunnels(tunnel, 0);
     }
-
 
     ilclient_disable_tunnel(tunnel);
     ilclient_disable_tunnel(tunnel+1);

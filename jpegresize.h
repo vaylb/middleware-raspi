@@ -22,6 +22,7 @@ public:
 
     quint32 screenWidth;
     quint32 screenHeight;
+    bool mExitFlag;
 
 signals:
     void showFrame(int width, int height);

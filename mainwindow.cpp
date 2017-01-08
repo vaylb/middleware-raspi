@@ -275,6 +275,15 @@ void MainWindow::device_scan_come()
                 mDataPool->Reset();
                 mPcmPool->Reset();
             }
+
+            if(mJpegResize != NULL){
+                mJpegResize->mExitFlag = true;
+                if(jpegResizeThread != NULL){
+                    jpegResizeThread->exit();
+                }
+                mJpegResize = NULL;
+                jpegResizeThread = NULL;
+            }
         }
         else if(strcmp(datagram.data(),"h")==0){
             videoShowTips->setText("文件打印...");
@@ -339,7 +348,7 @@ void MainWindow::receive_video_data()
 
 void MainWindow::showJpeg(int width, int height){
     if(mShowJpegFlag && !mJpegResize->framesOut.isEmpty()){
-        //qDebug()<<"showJpeg width = "<<width<<", height = "<<height;
+        qDebug()<<"showJpeg width = "<<width<<", height = "<<height;
         videoShow->setFixedWidth(width);
         videoShow->setFixedHeight(height);
         videoShow->setPixmap(QPixmap::fromImage(mJpegResize->framesOut.dequeue()));

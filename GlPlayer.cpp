@@ -131,9 +131,9 @@ void GlPlayer::initEGL(int width, int height){
 
     static const EGLint attribute_list[] =
     {
-        EGL_RED_SIZE, 8,
-        EGL_GREEN_SIZE, 8,
         EGL_BLUE_SIZE, 8,
+        EGL_GREEN_SIZE, 8,
+        EGL_RED_SIZE, 8,
         EGL_ALPHA_SIZE, 8,
         EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
         EGL_NONE
@@ -175,10 +175,19 @@ void GlPlayer::initEGL(int width, int height){
     QDesktopWidget *dwsktopwidget = QApplication::desktop();
     QRect deskrect = dwsktopwidget->availableGeometry();
 
+    int scale_w = 0, scale_h = 0;
+    if(p_state->height > p_state->width){
+        scale_h = deskrect.height()-24;
+        scale_w = (quint32)(p_state->width*scale_h/p_state->height);
+    }else{
+        scale_w = deskrect.width()-24;
+        scale_h = (quint32)(p_state->height*scale_w/p_state->width);
+    }
+
     dst_rect.x = 0;
     dst_rect.y = 0;
-    dst_rect.width = deskrect.width();
-    dst_rect.height = deskrect.height();
+    dst_rect.width = scale_w;
+    dst_rect.height = scale_h;
 
     src_rect.x = 0;
     src_rect.y = 0;

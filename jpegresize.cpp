@@ -13,9 +13,7 @@ JpegResize::JpegResize(QObject *parent) :
 }
 
 void JpegResize::resize(){
-    //qDebug() << "start resize";
     QImage img;
-//    QImage imgtemp;
     QImage pixmap;
     int width = 0,height = 0;
     while(!mExitFlag){
@@ -26,7 +24,6 @@ void JpegResize::resize(){
             width = img.width();
             height = img.height();
 //            qDebug()<<"Resize width = "<<width<<", height = "<<height;
-//            imgtemp = img.copy(0,0,width,height);
             int scale_w = 0, scale_h = 0;
             if(height > width){
                 scale_h = screenHeight-24;

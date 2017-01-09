@@ -9,7 +9,6 @@
 #include <QApplication>
 #include <QDesktopWidget>
 #include <QTime>
-//#define AVCODEC_MAX_AUDIO_FRAME_SIZE 192000 // 1 second of 48khz 32bit audio
 
 DataBuffer* MainWindow::video_compressed_data_pool = new DataBuffer(32768*32*8);//32k*16=1024*8k
 DataBuffer* MainWindow::mDataPool = new DataBuffer(1024*4*16);
@@ -46,12 +45,16 @@ MainWindow::MainWindow(QWidget *parent) :
     videoShow = new QLabel;
     videoShowTips = new QLabel;
     mainLayout = new QVBoxLayout;
-    mainLayout->addWidget(videoShow, 0, Qt::AlignCenter|Qt::AlignBottom);
+    mainLayout->addStretch();
+    mainLayout->addWidget(videoShow, 0, Qt::AlignCenter);
     videoShow->setText("中间件系统");
     videoShow->setStyleSheet("font-size:40px");
-    mainLayout->addWidget(videoShowTips,0, Qt::AlignCenter|Qt::AlignTop);
+    mainLayout->addWidget(videoShowTips,0, Qt::AlignCenter);
     videoShowTips->setText("等待连接...");
     videoShowTips->setStyleSheet("font-size:20px");
+    mainLayout->addStretch();
+
+
     setLayout(mainLayout);
     setWindowTitle("中间件系统");
     setWindowFlags(Qt::FramelessWindowHint);//去掉标题栏*/
@@ -60,9 +63,6 @@ MainWindow::MainWindow(QWidget *parent) :
     window_width = deskrect.width();
     window_height = deskrect.height();
     setFixedSize(window_width,window_height); //设置窗体固定大小
-//    gl = new CPlayWidget(this);
-//    gl->PlayOneFrame();
-//    mainLayout->addWidget(gl, 0, Qt::AlignCenter|Qt::AlignBottom);
     printscreeninfo();
 
     startListening();
@@ -181,6 +181,9 @@ void MainWindow::device_scan_come()
             videoShowTips->setHidden(true);
 
             qDebug()<<"init jpegResizeThread";
+            bytesReceived = 0;
+            TotalBytes = 0;
+            mShowJpegFlag = true;
             jpegResizeThread = new QThread(this);
             mJpegResize = new JpegResize();
             mJpegResize->moveToThread(jpegResizeThread);
@@ -223,15 +226,15 @@ void MainWindow::device_scan_come()
             audio_data_receiver->connectToHost(*hostaddr, audio_data_port);
         }
         else if(strcmp(datagram.data(),"f")==0){          
-            QDesktopWidget *dwsktopwidget = QApplication::desktop();
-            QRect deskrect = dwsktopwidget->availableGeometry();
-            videoShow->setFixedWidth(deskrect.width());
-            videoShow->setFixedHeight(deskrect.height()/2);
+//            QDesktopWidget *dwsktopwidget = QApplication::desktop();
+//            QRect deskrect = dwsktopwidget->availableGeometry();
+//            videoShow->setFixedWidth(deskrect.width());
+//            videoShow->setFixedHeight(deskrect.height()/2);
             videoShow->setText("中间件系统");
-            videoShow->setAlignment(Qt::AlignCenter|Qt::AlignBottom);
+//            videoShow->setAlignment(Qt::AlignCenter|Qt::AlignBottom);
             videoShowTips->setHidden(false);
             videoShowTips->setText("播放结束");
-            videoShowTips->setAlignment(Qt::AlignCenter|Qt::AlignTop);
+//            videoShowTips->setAlignment(Qt::AlignCenter|Qt::AlignTop);
 
 
             mShowJpegFlag = false;
@@ -283,6 +286,8 @@ void MainWindow::device_scan_come()
                 }
                 mJpegResize = NULL;
                 jpegResizeThread = NULL;
+                video_data_receiver->readAll();
+                video_data_receiver->close();
             }
         }
         else if(strcmp(datagram.data(),"h")==0){
@@ -317,7 +322,6 @@ void MainWindow::receive_video_data()
 
     if (bytesReceived < TotalBytes){
         qint32  available = video_data_receiver->bytesAvailable();
-//        qDebug() <<"image available:"<<available;
         if((bytesReceived+available)>TotalBytes){
             available = TotalBytes-bytesReceived;
             inBlock = video_data_receiver->read(available);
@@ -336,7 +340,7 @@ void MainWindow::receive_video_data()
 
         QImage img;
         int ret = img.loadFromData(imagebuffer->data());
-        if(ret){
+        if(ret && mJpegResize != NULL && !mJpegResize->mExitFlag){
             mJpegResize->framesIn.append(img);
         }
         imagebuffer->close();
@@ -347,10 +351,8 @@ void MainWindow::receive_video_data()
 }
 
 void MainWindow::showJpeg(int width, int height){
-    if(mShowJpegFlag && !mJpegResize->framesOut.isEmpty()){
-        qDebug()<<"showJpeg width = "<<width<<", height = "<<height;
-        videoShow->setFixedWidth(width);
-        videoShow->setFixedHeight(height);
+    if(mShowJpegFlag && mJpegResize != NULL && !mJpegResize->mExitFlag && !mJpegResize->framesOut.isEmpty()){
+//        qDebug()<<"showJpeg width = "<<width<<", height = "<<height;
         videoShow->setPixmap(QPixmap::fromImage(mJpegResize->framesOut.dequeue()));
     }
 }
@@ -359,7 +361,7 @@ void MainWindow::showJpeg(int width, int height){
 //QAbstractSocket类提供了所有scoket的通用功能，socketError为枚举型
 void MainWindow::displayError(QAbstractSocket::SocketError socketError)
 {
-    qDebug() <<"error msg:"<< video_compressed_data_receiver->errorString();
+    qDebug() <<"error msg:"<< video_data_receiver->errorString();
 }
 
 //receive compressed video data and start thread to decodec
@@ -417,7 +419,6 @@ void MainWindow::receive_compressed_video_data()
             video_compressed_data_receiver->close();
 
         }else{
-//            qDebug() <<"video playback emit ready signal, current size:"+QString::number(mVideoDataFileReceived);
             usleep(10000);
             emit video_compressed_data_receiver->readyRead();
         }
@@ -444,13 +445,10 @@ void MainWindow::showVideo()
         videoDecThread = NULL;
         video_compressed_data_pool->Reset();
         sendMessage(getJobDoneMsg());
-        videoShow->setFixedWidth(window_width);
-        videoShow->setFixedHeight(window_height/2);
+
         videoShow->setText("中间件系统");
-        videoShow->setAlignment(Qt::AlignCenter|Qt::AlignBottom);
         videoShowTips->setHidden(false);
         videoShowTips->setText("播放结束");
-        videoShowTips->setAlignment(Qt::AlignCenter|Qt::AlignTop);
         return;
     }
 
@@ -527,45 +525,6 @@ void MainWindow::receive_setup_data(){
 }
 
 void MainWindow::receive_audio_data(){
-//    if(!mAudioDataFileFlag){
-//        qint32 available = audio_data_receiver->bytesAvailable();
-//        qint32 data_pool_can_write  = 0;
-//        while((data_pool_can_write = mDataPool->getWriteSpace()) <=0){
-//            usleep(2000);
-//        }
-
-//        if(data_pool_can_write==0) {
-//    //        qDebug()<<"new data but datapool can not write, can read "<<mDataPool->getReadSpace();
-//            return;
-//        }
-
-//        qint32 read_temp = available>data_pool_can_write?data_pool_can_write:available;
-//        if(read_temp>4096){
-//            read_temp = 4096;
-//        }
-//        audioInBlock = audio_data_receiver->read(read_temp);
-//        mDataPool->Write(audioInBlock.data(),read_temp);
-//        audioInBlock.resize(0);
-//        //qDebug() <<"data available:"<<available<<", datapool has:"<<video_compressed_data_pool->getReadSpace();
-
-//        if(!mAudioStartFlag && mDataPool->getReadSpace()>4096*8){
-//            mAudioStartFlag = true;
-//            audioPlayThread = new QThread(this);
-//            mAudioPlayer->moveToThread(audioPlayThread);
-
-//            connect(this,SIGNAL(audio_play_s()),mAudioPlayer,SLOT(play()));
-//            audioPlayThread->start();
-//            emit audio_play_s();
-
-//            if(mKAudioType == TYPE_AAC){
-//                audioDecodeThread = new QThread(this);
-//                mAudioDec->moveToThread(audioDecodeThread);
-//                connect(this,SIGNAL(decode_s()),mAudioDec,SLOT(decode()));
-//                audioDecodeThread->start();
-//                emit decode_s();
-//            }
-//        }
-//    }else
     if(mAudioDataFileFlag){
         if(mAudioDataFileReceived < sizeof(quint32)){
             QDataStream *instream = new QDataStream(audio_data_receiver);
@@ -638,6 +597,7 @@ void MainWindow::receive_audio_data(){
                 audioDecodeThread = NULL;
                 mDataPool->Reset();
                 mPcmPool->Reset();
+                videoShowTips->setText("播放结束");
             }else{
                 usleep(10000);
                 emit audio_data_receiver->readyRead();

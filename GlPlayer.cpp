@@ -131,9 +131,9 @@ void GlPlayer::initEGL(int width, int height){
 
     static const EGLint attribute_list[] =
     {
-        EGL_BLUE_SIZE, 8,
-        EGL_GREEN_SIZE, 8,
         EGL_RED_SIZE, 8,
+        EGL_GREEN_SIZE, 8,
+        EGL_BLUE_SIZE, 8,
         EGL_ALPHA_SIZE, 8,
         EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
         EGL_NONE
@@ -186,8 +186,8 @@ void GlPlayer::initEGL(int width, int height){
 
     dst_rect.x = 0;
     dst_rect.y = 0;
-    dst_rect.width = scale_w;
-    dst_rect.height = scale_h;
+    dst_rect.width = deskrect.width();
+    dst_rect.height = deskrect.height();
 
     src_rect.x = 0;
     src_rect.y = 0;

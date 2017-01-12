@@ -5,6 +5,7 @@
 #include <QImage>
 #include <QDebug>
 #include <QQueue>
+#include <QMutex>
 #include <unistd.h>
 #include "mainwindow.h"
 
@@ -16,13 +17,14 @@ class JpegResize : public QObject
 public:
     explicit JpegResize(QObject *parent = 0);
 
-    QQueue<QImage> framesIn;
+    static QQueue<QImage> framesIn;
 //    QQueue<QPixmap> framesOut;
-    QQueue<QImage> framesOut;
+    static QQueue<QImage> framesOut;
 
     quint32 screenWidth;
     quint32 screenHeight;
-    bool mExitFlag;
+    static bool mExitFlag;
+    static QMutex mutex;
 
 signals:
     void showFrame(int width, int height);

@@ -2,23 +2,29 @@
 #include <QApplication>
 #include <QDesktopWidget>
 
+QQueue<QImage> JpegResize::framesIn;
+QQueue<QImage> JpegResize::framesOut;
+QMutex JpegResize::mutex;
+bool JpegResize::mExitFlag = false;
+
 JpegResize::JpegResize(QObject *parent) :
-    QObject(parent),
-    mExitFlag(false)
+    QObject(parent)
 {
     QDesktopWidget *dwsktopwidget = QApplication::desktop();
     QRect deskrect = dwsktopwidget->availableGeometry();
     screenWidth = deskrect.width();
     screenHeight = deskrect.height();
+    mExitFlag = false;
 }
 
 void JpegResize::resize(){
+    qDebug()<<"Resize run";
     QImage img;
     QImage pixmap;
     int width = 0,height = 0;
     while(!mExitFlag){
         if(framesIn.isEmpty()){ //if empty then sleep
-            usleep(200000);
+            usleep(1000);
         }else{
             img = framesIn.dequeue();
             width = img.width();
@@ -34,7 +40,9 @@ void JpegResize::resize(){
             }
             pixmap = img.scaled(scale_w,scale_h,Qt::KeepAspectRatio,Qt::SmoothTransformation);
             if(!mExitFlag){
+                mutex.lock();
                 framesOut.append(pixmap);
+                mutex.unlock();
                 showFrame(scale_w, scale_h);
             }
         }

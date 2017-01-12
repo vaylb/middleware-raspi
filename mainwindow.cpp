@@ -21,8 +21,7 @@ MainWindow::MainWindow(QWidget *parent) :
     mVideoStartPlayFlag(false),
     bytesReceived(0),
     setupbytesReceived(0),
-    mJpegResize(NULL),
-    mShowJpegFlag(true),
+    mShowJpegFlag(false),
     mSetupFlag(false),
     mAudioStartFlag(false),
     mAudioPlayBackFlag(false),
@@ -39,9 +38,9 @@ MainWindow::MainWindow(QWidget *parent) :
     mAudioPlayer(NULL),
     mAudioDec(NULL),
     mVideoDataFileReceived(0),
-    mVideoDataFileTotalBytes(0)
+    mVideoDataFileTotalBytes(0),
+    mJpegResize(NULL)
 {
-//    setenv("EGL_FORCE_DRI3","1",1);
     videoShow = new QLabel;
     videoShowTips = new QLabel;
     mainLayout = new QVBoxLayout;
@@ -85,7 +84,7 @@ void MainWindow::startListening(){
     qDebug()<<"udp bind start";
     device_scan_receiver = new QUdpSocket(this);
     device_scan_port = 40001;
-    bool result = device_scan_receiver->bind(device_scan_port);
+    bool result = device_scan_receiver->bind(device_scan_port, QUdpSocket::ShareAddress);
     if(!result) {
         qDebug()<<"udp bind error\n";
         return ;
@@ -175,24 +174,28 @@ void MainWindow::device_scan_come()
             device_scan_join_up->writeDatagram(msg.data(), msg.size(),*hostaddr, 40002);
             delete device_scan_join_up;
             videoShowTips->setText("已连接至终端设备");
+            videoShowTips->show();
         }
         else if(strcmp(datagram.data(),"c")==0){
             videoShow->setText("");
             videoShowTips->setHidden(true);
+            if(!mShowJpegFlag){
+                qDebug()<<"init jpegResizeThread";
+                bytesReceived = 0;
+                TotalBytes = 0;
+                mShowJpegFlag = true;
 
-            qDebug()<<"init jpegResizeThread";
-            bytesReceived = 0;
-            TotalBytes = 0;
-            mShowJpegFlag = true;
-            jpegResizeThread = new QThread(this);
-            mJpegResize = new JpegResize();
-            mJpegResize->moveToThread(jpegResizeThread);
-            connect(this,SIGNAL(resize_s()),mJpegResize,SLOT(resize()));
-            connect(mJpegResize,SIGNAL(showFrame(int,int)),this,SLOT(showJpeg(int,int)));
-            jpegResizeThread->start();
-            emit resize_s();
-            //connect to mobile phone with tcp
-            video_data_receiver->connectToHost(*hostaddr, video_data_port);//连接到指定ip地址和端口的主机
+                jpegResizeThread = new QThread(this);
+                mJpegResize = new JpegResize();
+                mJpegResize->moveToThread(jpegResizeThread);
+
+                connect(this,SIGNAL(resize_s()),mJpegResize,SLOT(resize()));
+                connect(mJpegResize,SIGNAL(showFrame(int,int)),this,SLOT(showJpeg(int,int)));
+                jpegResizeThread->start();
+                emit resize_s();
+                //connect to mobile phone with tcp
+                video_data_receiver->connectToHost(*hostaddr, video_data_port);//连接到指定ip地址和端口的主机
+            }
         }
         else if(strcmp(datagram.data(),"d")==0){
 //            this->show();
@@ -226,18 +229,10 @@ void MainWindow::device_scan_come()
             audio_data_receiver->connectToHost(*hostaddr, audio_data_port);
         }
         else if(strcmp(datagram.data(),"f")==0){          
-//            QDesktopWidget *dwsktopwidget = QApplication::desktop();
-//            QRect deskrect = dwsktopwidget->availableGeometry();
-//            videoShow->setFixedWidth(deskrect.width());
-//            videoShow->setFixedHeight(deskrect.height()/2);
             videoShow->setText("中间件系统");
-//            videoShow->setAlignment(Qt::AlignCenter|Qt::AlignBottom);
             videoShowTips->setHidden(false);
             videoShowTips->setText("播放结束");
-//            videoShowTips->setAlignment(Qt::AlignCenter|Qt::AlignTop);
 
-
-            mShowJpegFlag = false;
             if(mVideoDec != NULL){
                 sendMessage(getJobDoneMsg());
                 video_compressed_data_receiver->close();
@@ -280,6 +275,7 @@ void MainWindow::device_scan_come()
             }
 
             if(mJpegResize != NULL){
+                mShowJpegFlag = false;
                 mJpegResize->mExitFlag = true;
                 if(jpegResizeThread != NULL){
                     jpegResizeThread->exit();
@@ -335,13 +331,14 @@ void MainWindow::receive_video_data()
     }
 
     if (bytesReceived == TotalBytes) {
+        //qDebug() <<"receive new image size:"<<TotalBytes;
         imagebuffer->close();
         imagebuffer->open(QIODevice::ReadOnly);
 
         QImage img;
         int ret = img.loadFromData(imagebuffer->data());
-        if(ret && mJpegResize != NULL && !mJpegResize->mExitFlag){
-            mJpegResize->framesIn.append(img);
+        if(ret && !JpegResize::mExitFlag){
+            JpegResize::framesIn.append(img);
         }
         imagebuffer->close();
         delete imagebuffer;
@@ -351,9 +348,11 @@ void MainWindow::receive_video_data()
 }
 
 void MainWindow::showJpeg(int width, int height){
-    if(mShowJpegFlag && mJpegResize != NULL && !mJpegResize->mExitFlag && !mJpegResize->framesOut.isEmpty()){
-//        qDebug()<<"showJpeg width = "<<width<<", height = "<<height;
-        videoShow->setPixmap(QPixmap::fromImage(mJpegResize->framesOut.dequeue()));
+    while(!JpegResize::mExitFlag && !JpegResize::framesOut.isEmpty()){
+        //qDebug()<<"showJpeg width = "<<width<<", height = "<<height;
+        JpegResize::mutex.lock();
+        videoShow->setPixmap(QPixmap::fromImage(JpegResize::framesOut.dequeue()));
+        JpegResize::mutex.unlock();
     }
 }
 

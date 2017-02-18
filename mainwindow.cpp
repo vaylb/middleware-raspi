@@ -46,7 +46,7 @@ MainWindow::MainWindow(QWidget *parent) :
     mainLayout = new QVBoxLayout;
     mainLayout->addStretch();
     mainLayout->addWidget(videoShow, 0, Qt::AlignCenter);
-    videoShow->setText("中间件系统");
+    videoShow->setText("协同适配中间件系统");
     videoShow->setStyleSheet("font-size:40px");
     mainLayout->addWidget(videoShowTips,0, Qt::AlignCenter);
     videoShowTips->setText("等待连接...");
@@ -55,7 +55,7 @@ MainWindow::MainWindow(QWidget *parent) :
 
 
     setLayout(mainLayout);
-    setWindowTitle("中间件系统");
+    setWindowTitle("协同适配中间件系统");
     setWindowFlags(Qt::FramelessWindowHint);//去掉标题栏*/
     QDesktopWidget *dwsktopwidget = QApplication::desktop();
     QRect deskrect = dwsktopwidget->availableGeometry();
@@ -228,8 +228,8 @@ void MainWindow::device_scan_come()
             mAudioPlayer = new AudioPlayer(1, 48000);
             audio_data_receiver->connectToHost(*hostaddr, audio_data_port);
         }
-        else if(strcmp(datagram.data(),"f")==0){          
-            videoShow->setText("中间件系统");
+        else if(strcmp(datagram.data(),"f")==0){
+            videoShow->setText("协同适配中间件系统");
             videoShowTips->setHidden(false);
             videoShowTips->setText("播放结束");
 
@@ -337,8 +337,8 @@ void MainWindow::receive_video_data()
 
         QImage img;
         int ret = img.loadFromData(imagebuffer->data());
-        if(ret && !JpegResize::mExitFlag){
-            JpegResize::framesIn.append(img);
+        if(ret && mJpegResize != NULL && !mJpegResize->mExitFlag){
+            mJpegResize->framesIn.append(img);
         }
         imagebuffer->close();
         delete imagebuffer;
@@ -348,11 +348,11 @@ void MainWindow::receive_video_data()
 }
 
 void MainWindow::showJpeg(int width, int height){
-    while(!JpegResize::mExitFlag && !JpegResize::framesOut.isEmpty()){
+    while(mJpegResize != NULL && !mJpegResize->mExitFlag && !mJpegResize->framesOut.isEmpty()){
         //qDebug()<<"showJpeg width = "<<width<<", height = "<<height;
-        JpegResize::mutex.lock();
-        videoShow->setPixmap(QPixmap::fromImage(JpegResize::framesOut.dequeue()));
-        JpegResize::mutex.unlock();
+        mJpegResize->mutex.lock();
+        videoShow->setPixmap(QPixmap::fromImage(mJpegResize->framesOut.dequeue()));
+        mJpegResize->mutex.unlock();
     }
 }
 
@@ -538,8 +538,11 @@ void MainWindow::receive_audio_data(){
     while(mAudioPlayer != NULL && !mAudioPlayer->mExitFlag && audio_data_receiver->bytesAvailable()>0){
         qint32 available = audio_data_receiver->bytesAvailable();
         qint32 data_pool_can_write  = 0;
-        while((data_pool_can_write = mDataPool->getWriteSpace()) <=0){
+        while(mAudioPlayer != NULL && !mAudioPlayer->mExitFlag && (data_pool_can_write = mDataPool->getWriteSpace()) <=0){
             usleep(100000);
+        }
+        if(mAudioPlayer == NULL || mAudioPlayer->mExitFlag){
+            break;
         }
 
         qint32 read_temp = available>data_pool_can_write?data_pool_can_write:available;

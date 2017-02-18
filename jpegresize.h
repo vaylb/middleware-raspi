@@ -17,14 +17,14 @@ class JpegResize : public QObject
 public:
     explicit JpegResize(QObject *parent = 0);
 
-    static QQueue<QImage> framesIn;
+    QQueue<QImage> framesIn;
 //    QQueue<QPixmap> framesOut;
-    static QQueue<QImage> framesOut;
+    QQueue<QImage> framesOut;
 
     quint32 screenWidth;
     quint32 screenHeight;
-    static bool mExitFlag;
-    static QMutex mutex;
+    bool mExitFlag;
+    QMutex mutex;
 
 signals:
     void showFrame(int width, int height);

@@ -2,19 +2,14 @@
 #include <QApplication>
 #include <QDesktopWidget>
 
-QQueue<QImage> JpegResize::framesIn;
-QQueue<QImage> JpegResize::framesOut;
-QMutex JpegResize::mutex;
-bool JpegResize::mExitFlag = false;
-
 JpegResize::JpegResize(QObject *parent) :
-    QObject(parent)
+    QObject(parent),
+    mExitFlag(false)
 {
     QDesktopWidget *dwsktopwidget = QApplication::desktop();
     QRect deskrect = dwsktopwidget->availableGeometry();
     screenWidth = deskrect.width();
     screenHeight = deskrect.height();
-    mExitFlag = false;
 }
 
 void JpegResize::resize(){

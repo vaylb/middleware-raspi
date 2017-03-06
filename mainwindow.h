@@ -13,6 +13,7 @@
 #include "audiodec.h"
 #include "glplayer.h"
 #include "OMXH264Player.h"
+#include "CommandHandler.h"
 
 class VideoDec;
 class JpegResize;
@@ -20,6 +21,7 @@ class AudioPlayer;
 class AudioDec;
 class CPlayWidget;
 class OMXH264Player;
+class CommandHaldler;
 
 namespace Ui {
 class MainWindow;
@@ -54,7 +56,7 @@ private slots:
     void on_pushButton_clicked();
     void sendMessage(QString msg);
 
-    void device_scan_come(); //scan
+    void device_scan_come(char* msg, const QString & host_ip); //scan
     void displayError(QAbstractSocket::SocketError);
     void printscreeninfo();
     void startListening();
@@ -94,6 +96,8 @@ public slots:
     void receive_file_data();
 
 private:
+    CommandHaldler* mCommandHandler;
+
     int window_width;
     int window_height;
     Ui::MainWindow *ui;

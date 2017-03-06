@@ -47,6 +47,7 @@ SOURCES += main.cpp\
     AudioPlayer.cpp \
     AudioDec.cpp \
     GlPlayer.cpp \
+    CommandHandler.cpp
 
 HEADERS  += mainwindow.h \
     DataBuffer.h \
@@ -55,7 +56,8 @@ HEADERS  += mainwindow.h \
     audioplayer.h \
     audiodec.h \
     glplayer.h \
-    OMXH264Player.h
+    OMXH264Player.h \
+    CommandHandler.h
 
 FORMS    += mainwindow.ui
 

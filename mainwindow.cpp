@@ -9,6 +9,7 @@
 #include <QApplication>
 #include <QDesktopWidget>
 #include <QTime>
+#include <QThread>
 
 DataBuffer* MainWindow::video_compressed_data_pool = new DataBuffer(32768*32*8);//32k*16=1024*8k
 DataBuffer* MainWindow::mDataPool = new DataBuffer(1024*4*16);
@@ -39,7 +40,8 @@ MainWindow::MainWindow(QWidget *parent) :
     mAudioDec(NULL),
     mVideoDataFileReceived(0),
     mVideoDataFileTotalBytes(0),
-    mJpegResize(NULL)
+    mJpegResize(NULL),
+    mCommandHandler(new CommandHaldler())
 {
     videoShow = new QLabel;
     videoShowTips = new QLabel;
@@ -65,15 +67,8 @@ MainWindow::MainWindow(QWidget *parent) :
     printscreeninfo();
 
     startListening();
-
-    //test omx player
-//    QThread *H264PlayThread = new QThread(this);
-//    OMXH264Player* H264Player = new OMXH264Player();
-//    H264Player->moveToThread(H264PlayThread);
-
-//    connect(this,SIGNAL(h264_play_s()),H264Player,SLOT(playbackTest()));
-//    H264PlayThread->start();
-//    emit h264_play_s();
+    connect(mCommandHandler,SIGNAL(handlemsg(char*, const QString &)),this,SLOT(device_scan_come(char*, const QString &)));
+    mCommandHandler->start();
 }
 
 MainWindow::~MainWindow()
@@ -82,14 +77,14 @@ MainWindow::~MainWindow()
 
 void MainWindow::startListening(){
     qDebug()<<"udp bind start";
-    device_scan_receiver = new QUdpSocket(this);
-    device_scan_port = 40001;
-    bool result = device_scan_receiver->bind(device_scan_port, QUdpSocket::ShareAddress);
-    if(!result) {
-        qDebug()<<"udp bind error\n";
-        return ;
-    }
-    connect(device_scan_receiver, SIGNAL(readyRead()),this, SLOT(device_scan_come()));
+//    device_scan_receiver = new QUdpSocket(this);
+//    device_scan_port = 40001;
+//    bool result = device_scan_receiver->bind(device_scan_port, QUdpSocket::ShareAddress);
+//    if(!result) {
+//        qDebug()<<"udp bind error\n";
+//        return ;
+//    }
+//    connect(device_scan_receiver, SIGNAL(readyRead()),this, SLOT(device_scan_come()));
 
     //jpeg数据
     video_data_port = 40004;
@@ -145,20 +140,12 @@ void MainWindow::slotClose()
     device_scan_receiver->close();
 }
 
-void MainWindow::device_scan_come()
+void MainWindow::device_scan_come(char* command, const QString & host_ip)
 {
-    while(device_scan_receiver->hasPendingDatagrams()) {
-        QByteArray datagram;
-        QHostAddress *hostaddr = new QHostAddress;
-        quint16 * hostport = new  quint16;
-        datagram.resize(device_scan_receiver->pendingDatagramSize());
-
-        device_scan_receiver->readDatagram(datagram.data(), datagram.size(),hostaddr,hostport);
-        QString host_ip = hostaddr->toString();
-        host_ip = host_ip.mid(host_ip.lastIndexOf(":")+1);
+        qDebug()<<"device scan, receive:"<<command<<", ip:"<<host_ip<<", thread id:"<<QThread::currentThreadId();
+        QHostAddress *hostaddr = new QHostAddress(host_ip);
         mHostAddr = host_ip;
-        qDebug()<<"device scan, receive:"<<datagram.data()<<", ip:"<<host_ip;
-        if(strcmp(datagram.data(),"a")==0){
+        if(strcmp(command,"a")==0){
             //response to device scan
             int type = getDeviceType();
             char mac[18];
@@ -176,7 +163,7 @@ void MainWindow::device_scan_come()
             videoShowTips->setText("已连接至终端设备");
             videoShowTips->show();
         }
-        else if(strcmp(datagram.data(),"c")==0){
+        else if(strcmp(command,"c")==0){
             videoShow->setText("");
             videoShowTips->setHidden(true);
             if(!mShowJpegFlag){
@@ -197,7 +184,7 @@ void MainWindow::device_scan_come()
                 video_data_receiver->connectToHost(*hostaddr, video_data_port);//连接到指定ip地址和端口的主机
             }
         }
-        else if(strcmp(datagram.data(),"d")==0){
+        else if(strcmp(command,"d")==0){
 //            this->show();
             videoShow->setText("");
             mainLayout->setAlignment(videoShow,Qt::AlignCenter);
@@ -205,13 +192,13 @@ void MainWindow::device_scan_come()
             mVideoDec = new VideoDec();
             video_compressed_data_receiver->connectToHost(*hostaddr, video_compressed_data_port);
         }
-        else if(!mSetupFlag && strcmp(datagram.data(),"g")==0){
+        else if(!mSetupFlag && strcmp(command,"g")==0){
             videoShowTips->setText("正在设置网络连接...");
             mSetupFlag = true;
             //connect to mobile phone with tcp
             device_setup_receiver->connectToHost(*hostaddr, device_setup_port);
         }
-        else if(!mAudioPlayBackFlag && strcmp(datagram.data(),"b")==0){
+        else if(!mAudioPlayBackFlag && strcmp(command,"b")==0){
             videoShowTips->setText("播放音乐...");
             mAudioPlayBackFlag  = true;
             mAudioDataFileFlag = true;
@@ -220,7 +207,7 @@ void MainWindow::device_scan_come()
             mAudioDec = new AudioDec();
             audio_data_receiver->connectToHost(*hostaddr, audio_data_port);
         }
-        else if(!mAudioPlayBackFlag && strcmp(datagram.data(),"e")==0){
+        else if(!mAudioPlayBackFlag && strcmp(command,"e")==0){
             videoShowTips->setText("播放音乐...");
             mAudioPlayBackFlag  = true;
             mKAudioType = TYPE_PCM;
@@ -228,7 +215,7 @@ void MainWindow::device_scan_come()
             mAudioPlayer = new AudioPlayer(1, 48000);
             audio_data_receiver->connectToHost(*hostaddr, audio_data_port);
         }
-        else if(strcmp(datagram.data(),"f")==0){
+        else if(strcmp(command,"f")==0){
             videoShow->setText("协同适配中间件系统");
             videoShowTips->setHidden(false);
             videoShowTips->setText("播放结束");
@@ -286,19 +273,20 @@ void MainWindow::device_scan_come()
                 video_data_receiver->close();
             }
         }
-        else if(strcmp(datagram.data(),"h")==0){
+        else if(strcmp(command,"h")==0){
             videoShowTips->setText("文件打印...");
             mPrintFileType = TYPE_FILE;
             file_data_receiver->connectToHost(*hostaddr, file_data_port);
         }
-        else if(strcmp(datagram.data(),"i")==0){
+        else if(strcmp(command,"i")==0){
             videoShowTips->setText("安装打印驱动...");
             mPrintFileType = TYPE_DRIVER;
             file_data_receiver->connectToHost(*hostaddr, file_data_port);
         }
-        delete hostaddr;
-        delete hostport;
-    }
+
+        if(mCommandHandler->checkstopflag){
+            mCommandHandler->checkstopflag = false;
+        }
 }
 
 void MainWindow::receive_video_data()
@@ -351,6 +339,9 @@ void MainWindow::showJpeg(int width, int height){
     while(mJpegResize != NULL && !mJpegResize->mExitFlag && !mJpegResize->framesOut.isEmpty()){
         //qDebug()<<"showJpeg width = "<<width<<", height = "<<height;
         mJpegResize->mutex.lock();
+        if(mJpegResize->framesOut.size() > 2){
+            mJpegResize->framesOut.dequeue();
+        }
         videoShow->setPixmap(QPixmap::fromImage(mJpegResize->framesOut.dequeue()));
         mJpegResize->mutex.unlock();
     }
@@ -375,7 +366,7 @@ void MainWindow::receive_compressed_video_data()
         }
         return;
     }
-    while(mVideoDec != NULL && !mVideoDec->exitFlag && video_compressed_data_receiver->bytesAvailable() > 0){
+    while(!mCommandHandler->checkstopflag && mVideoDec != NULL && !mVideoDec->exitFlag && video_compressed_data_receiver->bytesAvailable() > 0){
         qint32 available = video_compressed_data_receiver->bytesAvailable();
         qint32 data_pool_can_write = 0;
         while((data_pool_can_write = video_compressed_data_pool->getWriteSpace()) <=0){
@@ -535,7 +526,7 @@ void MainWindow::receive_audio_data(){
             return;
         }
     }
-    while(mAudioPlayer != NULL && !mAudioPlayer->mExitFlag && audio_data_receiver->bytesAvailable()>0){
+    while(!mCommandHandler->checkstopflag && mAudioPlayer != NULL && !mAudioPlayer->mExitFlag && audio_data_receiver->bytesAvailable()>0){
         qint32 available = audio_data_receiver->bytesAvailable();
         qint32 data_pool_can_write  = 0;
         while(mAudioPlayer != NULL && !mAudioPlayer->mExitFlag && (data_pool_can_write = mDataPool->getWriteSpace()) <=0){

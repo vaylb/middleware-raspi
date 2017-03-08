@@ -55,7 +55,6 @@ MainWindow::MainWindow(QWidget *parent) :
     videoShowTips->setStyleSheet("font-size:20px");
     mainLayout->addStretch();
 
-
     setLayout(mainLayout);
     setWindowTitle("协同适配中间件系统");
     setWindowFlags(Qt::FramelessWindowHint);//去掉标题栏*/
@@ -76,16 +75,6 @@ MainWindow::~MainWindow()
 }
 
 void MainWindow::startListening(){
-    qDebug()<<"udp bind start";
-//    device_scan_receiver = new QUdpSocket(this);
-//    device_scan_port = 40001;
-//    bool result = device_scan_receiver->bind(device_scan_port, QUdpSocket::ShareAddress);
-//    if(!result) {
-//        qDebug()<<"udp bind error\n";
-//        return ;
-//    }
-//    connect(device_scan_receiver, SIGNAL(readyRead()),this, SLOT(device_scan_come()));
-
     //jpeg数据
     video_data_port = 40004;
     video_data_receiver = new QTcpSocket(this);
@@ -296,7 +285,7 @@ void MainWindow::receive_video_data()
         if((video_data_receiver->bytesAvailable() >= sizeof(qint32))){
             *instream >> TotalBytes;
             bytesReceived += sizeof(qint32);
-//            qDebug() <<"receive new image size:"<<TotalBytes;
+            qDebug() <<"receive new image size:"<<TotalBytes;
         }
         imagedata.resize(0);
         imagebuffer = new QBuffer(&imagedata);
@@ -319,13 +308,14 @@ void MainWindow::receive_video_data()
     }
 
     if (bytesReceived == TotalBytes) {
-        //qDebug() <<"receive new image size:"<<TotalBytes;
+
         imagebuffer->close();
         imagebuffer->open(QIODevice::ReadOnly);
 
         QImage img;
         int ret = img.loadFromData(imagebuffer->data());
         if(ret && mJpegResize != NULL && !mJpegResize->mExitFlag){
+            qDebug() <<"receive new image size:"<<TotalBytes<<", width:"<<img.width()<<", height:"<<img.height();
             mJpegResize->framesIn.append(img);
         }
         imagebuffer->close();
@@ -337,7 +327,7 @@ void MainWindow::receive_video_data()
 
 void MainWindow::showJpeg(int width, int height){
     while(mJpegResize != NULL && !mJpegResize->mExitFlag && !mJpegResize->framesOut.isEmpty()){
-        //qDebug()<<"showJpeg width = "<<width<<", height = "<<height;
+        qDebug()<<"MainWindow showJpeg width = "<<width<<", height = "<<height;
         mJpegResize->mutex.lock();
         if(mJpegResize->framesOut.size() > 2){
             mJpegResize->framesOut.dequeue();

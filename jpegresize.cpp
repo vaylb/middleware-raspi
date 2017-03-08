@@ -38,6 +38,7 @@ void JpegResize::resize(){
                 mutex.lock();
                 framesOut.append(pixmap);
                 mutex.unlock();
+                qDebug()<<"JpegResize showFrame, width = "<<scale_w<<", height = "<<scale_h;
                 showFrame(scale_w, scale_h);
             }
         }

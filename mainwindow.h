@@ -2,9 +2,11 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include <QCloseEvent>
 #include <QtNetwork>
 #include <QDialog>
 #include <QLabel>
+#include <qdebug.h>
 #include <qlayout.h>
 #include "videodec.h"
 #include "DataBuffer.h"
@@ -50,7 +52,9 @@ public:
     explicit MainWindow(QWidget *parent = 0);
     ~MainWindow();
     int get_mac(char* mac);
+    float gettimeflag();
     void glplay();
+    void closeEvent(QCloseEvent *event);
 
 private slots:
     void on_pushButton_clicked();
@@ -94,6 +98,7 @@ signals:
 //file print
 public slots:
     void receive_file_data();
+    void receive_jpeg_data();
 
 private:
     CommandHaldler* mCommandHandler;
@@ -121,6 +126,8 @@ private:
     JpegResize * mJpegResize;
     QThread *jpegResizeThread;
     volatile bool mShowJpegFlag;
+    QTimer *pptTimer;
+    bool pptstartflag;
 
     //fpr use of compressed video data, .mp4 etc
     int video_compressed_data_port;

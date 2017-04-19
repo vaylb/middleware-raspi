@@ -98,6 +98,9 @@ void AudioPlayer::play()
     buffer =(char*)malloc(size);
     //fseek(fp,58,SEEK_SET); //定位歌曲到数据区
     int count = 0;
+    struct timeval time;
+    gettimeofday(&time, NULL);
+    qDebug()<<"audio end-time:"<< time.tv_sec*1000+time.tv_usec/1000;
     while (!mExitFlag)
     {
         memset(buffer,0,sizeof(buffer));

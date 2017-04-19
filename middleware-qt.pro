@@ -79,4 +79,4 @@ LIBS += -L/opt/vc/src/hello_pi/libs/ilclient \
         -lx264 -ltheoraenc -ltheoradec -lxvidcore -lvorbisfile -lvorbisenc \
         -lm -lz -lfaac -lmp3lame
 
-
+CONFIG += console

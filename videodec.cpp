@@ -107,6 +107,9 @@ void VideoDec::play()
     OMXH264Player* h264player = new OMXH264Player();
     qDebug()<<"-------decodec video size:"<<pCodecCtxVideo->width<<"x"<<pCodecCtxVideo->height<<"-------";
     AVBitStreamFilterContext* bsfc = av_bitstream_filter_init("h264_mp4toannexb");
+    struct timeval time;
+    gettimeofday(&time, NULL);
+    qDebug()<<"video end-time:"<< time.tv_sec*1000+time.tv_usec/1000;
     while(!exitFlag && av_read_frame(pFormatCtx,&packet)>=0){
         if(packet.stream_index == videoindex){
             av_bitstream_filter_filter(bsfc, pCodecCtxVideo, NULL, &packet.data, &packet.size, packet.data, packet.size, 0);

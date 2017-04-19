@@ -24,6 +24,7 @@ public:
     quint32 screenWidth;
     quint32 screenHeight;
     bool mExitFlag;
+    bool mTimeFlag;
     QMutex mutex;
 
 signals:

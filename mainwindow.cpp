@@ -10,6 +10,7 @@
 #include <QDesktopWidget>
 #include <QTime>
 #include <QThread>
+#include <sys/time.h>
 
 DataBuffer* MainWindow::video_compressed_data_pool = new DataBuffer(32768*32*8);//32k*16=1024*8k
 DataBuffer* MainWindow::mDataPool = new DataBuffer(1024*4*16);
@@ -41,7 +42,9 @@ MainWindow::MainWindow(QWidget *parent) :
     mVideoDataFileReceived(0),
     mVideoDataFileTotalBytes(0),
     mJpegResize(NULL),
-    mCommandHandler(new CommandHaldler())
+    mCommandHandler(new CommandHaldler()),
+    pptTimer(NULL),
+    pptstartflag(false)
 {
     videoShow = new QLabel;
     videoShowTips = new QLabel;
@@ -153,8 +156,12 @@ void MainWindow::device_scan_come(char* command, const QString & host_ip)
             videoShowTips->show();
         }
         else if(strcmp(command,"c")==0){
-            videoShow->setText("");
+            struct timeval time;
+            gettimeofday(&time, NULL);
+            qDebug()<<"ppt start-time:"<< time.tv_sec*1000+time.tv_usec/1000;
+            videoShow->setText(" ");
             videoShowTips->setHidden(true);
+            pptstartflag = false;
             if(!mShowJpegFlag){
                 qDebug()<<"init jpegResizeThread";
                 bytesReceived = 0;
@@ -169,12 +176,22 @@ void MainWindow::device_scan_come(char* command, const QString & host_ip)
                 connect(mJpegResize,SIGNAL(showFrame(int,int)),this,SLOT(showJpeg(int,int)));
                 jpegResizeThread->start();
                 emit resize_s();
+
                 //connect to mobile phone with tcp
                 video_data_receiver->connectToHost(*hostaddr, video_data_port);//连接到指定ip地址和端口的主机
+                if(pptTimer == NULL){
+                    pptTimer = new QTimer(this);
+                }
+                connect(pptTimer,SIGNAL(timeout()),this,SLOT(receive_jpeg_data()));
+//                emit video_data_receiver->readyRead();
+                pptTimer->start(35);
             }
         }
         else if(strcmp(command,"d")==0){
 //            this->show();
+            struct timeval time;
+            gettimeofday(&time, NULL);
+            qDebug()<<"video start-time:"<< time.tv_sec*1000+time.tv_usec/1000;
             videoShow->setText("");
             mainLayout->setAlignment(videoShow,Qt::AlignCenter);
             videoShowTips->setHidden(true);
@@ -188,6 +205,9 @@ void MainWindow::device_scan_come(char* command, const QString & host_ip)
             device_setup_receiver->connectToHost(*hostaddr, device_setup_port);
         }
         else if(!mAudioPlayBackFlag && strcmp(command,"b")==0){
+            struct timeval time;
+            gettimeofday(&time, NULL);
+            qDebug()<<"audio start-time:"<< time.tv_sec*1000+time.tv_usec/1000;
             videoShowTips->setText("播放音乐...");
             mAudioPlayBackFlag  = true;
             mAudioDataFileFlag = true;
@@ -207,7 +227,8 @@ void MainWindow::device_scan_come(char* command, const QString & host_ip)
         else if(strcmp(command,"f")==0){
             videoShow->setText("协同适配中间件系统");
             videoShowTips->setHidden(false);
-            videoShowTips->setText("播放结束");
+            if(!(mJpegResize != NULL && !pptstartflag))
+                videoShowTips->setText("播放结束");
 
             if(mVideoDec != NULL){
                 sendMessage(getJobDoneMsg());
@@ -260,9 +281,15 @@ void MainWindow::device_scan_come(char* command, const QString & host_ip)
                 jpegResizeThread = NULL;
                 video_data_receiver->readAll();
                 video_data_receiver->close();
+                if(pptTimer != NULL){
+                    pptTimer->stop();
+                }
             }
         }
         else if(strcmp(command,"h")==0){
+            struct timeval time;
+            gettimeofday(&time, NULL);
+            qDebug()<<"------------------------------pdf start-time:"<< time.tv_sec*1000+time.tv_usec/1000;
             videoShowTips->setText("文件打印...");
             mPrintFileType = TYPE_FILE;
             file_data_receiver->connectToHost(*hostaddr, file_data_port);
@@ -278,14 +305,22 @@ void MainWindow::device_scan_come(char* command, const QString & host_ip)
         }
 }
 
-void MainWindow::receive_video_data()
-{
+void MainWindow::receive_jpeg_data(){
+    emit video_data_receiver->readyRead();
+}
+
+void MainWindow::receive_video_data(){
+    qDebug() <<"receive_video_data signal come, "<<video_data_receiver->bytesAvailable();
+    if(video_data_receiver->bytesAvailable()==0){
+        return;
+    }
     if(bytesReceived < sizeof(qint32)){
         instream = new QDataStream(video_data_receiver);
         if((video_data_receiver->bytesAvailable() >= sizeof(qint32))){
             *instream >> TotalBytes;
             bytesReceived += sizeof(qint32);
             qDebug() <<"receive new image size:"<<TotalBytes;
+            pptstartflag = true;
         }
         imagedata.resize(0);
         imagebuffer = new QBuffer(&imagedata);
@@ -315,7 +350,7 @@ void MainWindow::receive_video_data()
         QImage img;
         int ret = img.loadFromData(imagebuffer->data());
         if(ret && mJpegResize != NULL && !mJpegResize->mExitFlag){
-            qDebug() <<"receive new image size:"<<TotalBytes<<", width:"<<img.width()<<", height:"<<img.height();
+//            qDebug() <<"receive new image size:"<<TotalBytes<<", width:"<<img.width()<<", height:"<<img.height();
             mJpegResize->framesIn.append(img);
         }
         imagebuffer->close();
@@ -327,7 +362,7 @@ void MainWindow::receive_video_data()
 
 void MainWindow::showJpeg(int width, int height){
     while(mJpegResize != NULL && !mJpegResize->mExitFlag && !mJpegResize->framesOut.isEmpty()){
-        qDebug()<<"MainWindow showJpeg width = "<<width<<", height = "<<height;
+//        qDebug()<<"MainWindow showJpeg width = "<<width<<", height = "<<height;
         mJpegResize->mutex.lock();
         if(mJpegResize->framesOut.size() > 2){
             mJpegResize->framesOut.dequeue();
@@ -426,7 +461,7 @@ void MainWindow::showVideo()
         video_compressed_data_pool->Reset();
         sendMessage(getJobDoneMsg());
 
-        videoShow->setText("中间件系统");
+        videoShow->setText("协同适配中间件系统");
         videoShowTips->setHidden(false);
         videoShowTips->setText("播放结束");
         return;
@@ -643,12 +678,15 @@ void MainWindow::receive_file_data()
         qDebug() <<"file receive success";
 
         if(mPrintFileType == TYPE_FILE){
+            struct timeval time;
+            gettimeofday(&time, NULL);
+            qDebug()<<"------------------------------pdf end-time:"<< time.tv_sec*1000+time.tv_usec/1000;
             QString command_fix = "sudo pdftk "+filename+" output "+filefixname;
             system(command_fix.toStdString().c_str());
             QString command_rm = "sudo rm "+filename;
             system(command_rm.toStdString().c_str());
             QString command_print = "sudo lp -d HP_1010 "+filefixname;
-            system(command_print.toStdString().c_str());
+            //system(command_print.toStdString().c_str());
         } else if(mPrintFileType == TYPE_DRIVER){
             QString command_driver = "sudo dpkg -i "+filename;
             system(command_driver.toStdString().c_str());
@@ -743,6 +781,15 @@ int MainWindow::getDeviceType(){
 
 void MainWindow::logDebug(QString msg){
     qDebug()<<"logDebug:"<<msg.toStdString().c_str();
+}
+float MainWindow::gettimeflag(){
+    struct timeval time;
+    gettimeofday(&time, NULL);
+    return time.tv_sec*1000+time.tv_usec/1000;
+}
+
+void MainWindow::closeEvent(QCloseEvent *event){
+    exit(0);
 }
 
 void MainWindow::glplay(){

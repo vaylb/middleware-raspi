@@ -4,7 +4,8 @@
 
 JpegResize::JpegResize(QObject *parent) :
     QObject(parent),
-    mExitFlag(false)
+    mExitFlag(false),
+    mTimeFlag(true)
 {
     QDesktopWidget *dwsktopwidget = QApplication::desktop();
     QRect deskrect = dwsktopwidget->availableGeometry();
@@ -17,6 +18,7 @@ void JpegResize::resize(){
     QImage img;
     QImage pixmap;
     int width = 0,height = 0;
+
     while(!mExitFlag){
         if(framesIn.isEmpty()){ //if empty then sleep
             usleep(1000);
@@ -38,7 +40,13 @@ void JpegResize::resize(){
                 mutex.lock();
                 framesOut.append(pixmap);
                 mutex.unlock();
-                qDebug()<<"JpegResize showFrame, width = "<<scale_w<<", height = "<<scale_h;
+//                qDebug()<<"JpegResize showFrame, width = "<<scale_w<<", height = "<<scale_h;
+                if(mTimeFlag){
+                    struct timeval time;
+                    gettimeofday(&time, NULL);
+                    qDebug()<<"ppt end-time:"<< time.tv_sec*1000+time.tv_usec/1000;
+                    mTimeFlag = false;
+                }
                 showFrame(scale_w, scale_h);
             }
         }
